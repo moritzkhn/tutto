@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>Tutto! Kartenstapel & Punktezähler</title>
+  <title>Tutto! Kartenstapel & Spiel-Assistent</title>
   
   <!-- PWA & Mobile Web App Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -12,7 +12,7 @@
   <meta name="theme-color" content="#0F172A" />
   <link rel="manifest" href="manifest.json" />
 
-  <!-- Tailwind CSS CDN for modern UI -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -28,58 +28,49 @@
       overflow-x: hidden;
     }
     
-    /* 3D Card Flip Animation Styles */
-    .perspective-1000 {
-      perspective: 1000px;
-    }
-    .transform-style-3d {
-      transform-style: preserve-3d;
-    }
-    .backface-hidden {
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
-    }
-    .rotate-y-180 {
-      transform: rotateY(180deg);
-    }
-    
-    .card-transition {
-      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    }
+    .perspective-1000 { perspective: 1000px; }
+    .transform-style-3d { transform-style: preserve-3d; }
+    .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .rotate-y-180 { transform: rotateY(180deg); }
+    .card-transition { transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
 
-    /* Custom Scrollbar */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #1E293B;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #475569;
-      border-radius: 3px;
-    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1E293B; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
   </style>
 </head>
 <body class="flex flex-col h-screen max-w-md mx-auto justify-between bg-slate-900">
 
   <!-- TOP HEADER & PLAYER BAR -->
   <header class="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between shadow-md">
-    <button onclick="openModal('scoreboardModal')" class="flex items-center bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-full border border-slate-600 transition">
-      <i data-lucide="user-check" class="w-5 h-5 text-sky-400 mr-2"></i>
+    
+    <!-- MODE / PLAYER PILL -->
+    <button id="playerHeaderPill" onclick="openModal('scoreboardModal')" class="flex items-center bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-full border border-slate-600 transition">
+      <i data-lucide="user-check" class="w-4 h-4 text-sky-400 mr-2"></i>
       <div class="text-left">
-        <div class="text-[10px] text-slate-400 font-bold uppercase leading-tight">Am Zug</div>
-        <div id="activePlayerName" class="text-sm font-extrabold text-slate-100 leading-tight">Spieler 1</div>
+        <div class="text-[9px] text-slate-400 font-bold uppercase leading-tight">Am Zug</div>
+        <div id="activePlayerName" class="text-xs font-extrabold text-slate-100 leading-tight">Spieler 1</div>
       </div>
-      <span id="activePlayerScore" class="ml-3 bg-sky-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">0 Pkt</span>
+      <span id="activePlayerScore" class="ml-2 bg-sky-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">0 Pkt</span>
     </button>
 
-    <div class="flex items-center space-x-2">
-      <button onclick="openModal('inspectorModal')" class="flex items-center bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-full border border-slate-600 text-slate-300 text-xs font-bold transition">
-        <i data-lucide="layers" class="w-4 h-4 mr-1 text-slate-400"></i>
+    <!-- PURE DECK MODE HEADER BADGE -->
+    <div id="deckModeBadge" class="hidden text-sm font-black text-amber-400 tracking-wider">
+      🃏 TUTTO! STAPEL
+    </div>
+
+    <!-- HEADER CONTROLS -->
+    <div class="flex items-center space-x-1.5">
+      <button onclick="openModal('modeSelectModal')" title="Modus wechseln" class="p-2 text-slate-300 hover:text-white bg-slate-700 rounded-full border border-slate-600 transition">
+        <i data-lucide="settings" class="w-4 h-4 text-slate-300"></i>
+      </button>
+
+      <button onclick="openModal('inspectorModal')" class="flex items-center bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded-full border border-slate-600 text-slate-300 text-xs font-bold transition">
+        <i data-lucide="layers" class="w-3.5 h-3.5 mr-1 text-slate-400"></i>
         <span id="deckCounter">56 / 56</span>
       </button>
 
-      <button onclick="openModal('scoreboardModal')" class="p-2 text-slate-300 hover:text-white transition">
+      <button id="headerTrophyBtn" onclick="openModal('scoreboardModal')" class="p-2 text-slate-300 hover:text-white transition">
         <i data-lucide="trophy" class="w-5 h-5 text-amber-400"></i>
       </button>
 
@@ -98,7 +89,7 @@
   <main class="flex-1 flex flex-col items-center justify-center p-4 relative">
     
     <!-- CARD CONTAINER (FLIP ANIMATION) -->
-    <div class="w-full max-w-xs h-[360px] perspective-1000">
+    <div class="w-full max-w-xs h-[350px] perspective-1000">
       <div id="cardInner" class="w-full h-full relative transform-style-3d card-transition rounded-3xl shadow-2xl">
         
         <!-- CARD BACK (COVER) -->
@@ -107,36 +98,33 @@
             <i data-lucide="square" class="w-10 h-10 text-slate-400"></i>
           </div>
           <h1 class="text-3xl font-black tracking-wider text-slate-100 mb-1">TUTTO!</h1>
-          <p class="text-xs text-slate-400 font-semibold mb-6">Tippe hier, um die Karte zu ziehen</p>
+          <p id="cardBackSubtitle" class="text-xs text-slate-400 font-semibold mb-6">Tippe hier, um eine Karte zu ziehen</p>
           <span class="bg-slate-700 text-sky-400 text-xs font-bold px-4 py-1.5 rounded-full border border-slate-600">56 Karten im Stapel</span>
         </div>
 
         <!-- CARD FRONT (FACE) -->
         <div id="cardFront" class="absolute inset-0 backface-hidden rotate-y-180 rounded-3xl border-4 flex flex-col justify-between overflow-hidden shadow-2xl bg-amber-50 border-amber-500">
           
-          <!-- CARD HEADER BANNER -->
           <div id="cardBanner" class="bg-amber-500 text-white py-3 text-center">
             <h2 id="cardTitle" class="text-xl font-black tracking-wider uppercase">BONUS 500</h2>
           </div>
 
-          <!-- CARD BODY -->
           <div class="flex-1 flex flex-col items-center justify-center p-4 text-center">
             <div id="cardBadge" class="bg-amber-500 text-white font-black text-2xl px-5 py-1.5 rounded-full mb-3 shadow">
               +500
             </div>
             
             <div id="cardIconContainer" class="my-2">
-              <i id="cardIcon" data-lucide="gift" class="w-16 h-16 text-amber-600"></i>
+              <i id="cardIcon" data-lucide="gift" class="w-14 h-14 text-amber-600"></i>
             </div>
 
-            <div class="bg-white/80 backdrop-blur border border-amber-200 rounded-2xl p-3.5 mt-2 shadow-sm">
+            <div class="bg-white/85 backdrop-blur border border-amber-200 rounded-2xl p-3 mt-1 shadow-sm">
               <p id="cardDescription" class="text-xs font-bold text-amber-900 leading-relaxed">
                 Erzielst du ein Tutto, erhältst du zusätzlich 500 Punkte zu deinen Würfelpunkten.
               </p>
             </div>
           </div>
 
-          <!-- CARD FOOTER -->
           <div class="bg-black/10 py-2 text-center">
             <span id="cardFooterText" class="text-[11px] font-bold text-slate-700">Karte 1 von 56</span>
           </div>
@@ -148,18 +136,18 @@
 
   </main>
 
-  <!-- SCORE ASSISTANT & TURN TRACKER -->
-  <section class="bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg">
+  <!-- SCORE ASSISTANT & CONTROLS (FULL GAME MODE ONLY) -->
+  <section id="fullGameSection" class="bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg">
     
     <!-- TURN SCORE DISPLAY -->
-    <div class="bg-slate-900 rounded-2xl p-3 border border-slate-700 text-center mb-3 flex items-center justify-between px-5">
+    <div class="bg-slate-900 rounded-2xl p-3 border border-slate-700 text-center mb-3 flex items-center justify-between px-4">
       <div>
-        <div class="text-[10px] text-slate-400 font-extrabold tracking-wider uppercase">Punkte dieser Runde</div>
-        <div id="turnScoreValue" class="text-3xl font-black text-amber-400 leading-tight">0</div>
+        <div class="text-[9px] text-slate-400 font-extrabold tracking-wider uppercase">Punkte dieser Runde</div>
+        <div id="turnScoreValue" class="text-3xl font-black text-amber-400 leading-none mt-0.5">0</div>
       </div>
 
       <!-- TUTTO BUTTON -->
-      <button id="btnTutto" onclick="triggerTutto()" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-4 py-2.5 rounded-xl shadow transition flex items-center space-x-1.5">
+      <button id="btnTutto" onclick="triggerTutto()" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-4 py-2.5 rounded-xl shadow transition flex items-center space-x-1.5 animate-pulse">
         <i data-lucide="sparkles" class="w-4 h-4"></i>
         <span>TUTTO!</span>
       </button>
@@ -167,10 +155,7 @@
 
     <!-- QUICK ADD DICE BUTTONS -->
     <div id="diceQuickSection" class="hidden mb-3">
-      <div class="flex items-center justify-between text-[10px] font-extrabold text-slate-400 uppercase mb-2">
-        <span>Würfelpunkte hinzufügen:</span>
-      </div>
-      <div class="grid grid-cols-4 gap-1.5 mb-2">
+      <div class="grid grid-cols-4 gap-1.5">
         <button onclick="addDicePoints(50)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+50</button>
         <button onclick="addDicePoints(100)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+100</button>
         <button onclick="addDicePoints(200)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+200</button>
@@ -182,52 +167,66 @@
       </div>
     </div>
 
-    <!-- BOTTOM PRIMARY ACTION BUTTONS -->
-    <div id="controlsDraw" class="flex">
-      <button onclick="drawCard()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
-        <i data-lucide="arrow-right-circle" class="w-5 h-5"></i>
-        <span id="btnDrawText">KARTE ZIEHEN</span>
-      </button>
-    </div>
-
-    <div id="controlsStopp" class="hidden flex">
-      <button onclick="endTurnStopp()" class="w-full bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
-        <i data-lucide="octagon" class="w-5 h-5"></i>
-        <span>STOPP – NÄCHSTER SPIELER</span>
-      </button>
-    </div>
-
-    <div id="controlsSplit" class="hidden grid grid-cols-2 gap-3">
-      <!-- NIETE / GAMBLE LOST -->
-      <button onclick="triggerNiete()" class="bg-red-600 hover:bg-red-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-1.5">
-        <i data-lucide="x-circle" class="w-4 h-4"></i>
-        <span>VERZOCKT! (0 PKT)</span>
-      </button>
-
-      <!-- BANK POINTS & END TURN -->
-      <button onclick="bankPointsAndEnd()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-1.5">
-        <i data-lucide="check-circle" class="w-4 h-4"></i>
-        <span>PUNKTE SICHERN</span>
-      </button>
+    <!-- DYNAMIC BOTTOM ACTION BUTTONS -->
+    <div id="controlsContainer">
+      <!-- Injected by JS -->
     </div>
 
   </section>
 
-  <!-- MODAL 1: SCOREBOARD & PLAYERS -->
+  <!-- PURE CARD DECK CONTROLS (STAPEL-NUR MODUS) -->
+  <section id="pureDeckSection" class="hidden bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg">
+    <button onclick="drawCard()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm py-4 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
+      <i data-lucide="arrow-right-circle" class="w-5 h-5"></i>
+      <span>NÄCHSTE KARTE ZIEHEN</span>
+    </button>
+  </section>
+
+  <!-- MODAL 0: STARTUP MODE SELECTOR & PRE-GAME SETUP -->
+  <div id="modeSelectModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+      <h2 class="text-2xl font-black text-center text-white mb-1">TUTTO!</h2>
+      <p class="text-xs text-center text-slate-400 mb-5 font-semibold">Wähle deinen bevorzugten Spielmodus:</p>
+
+      <div class="space-y-3 mb-6">
+        <!-- MODE 1: FULL GAME -->
+        <button onclick="selectGameMode('full')" class="w-full bg-slate-700 hover:bg-slate-600 border-2 border-sky-500/80 p-4 rounded-2xl text-left transition flex items-start space-x-3">
+          <i data-lucide="trophy" class="w-7 h-7 text-amber-400 mt-0.5"></i>
+          <div>
+            <div class="text-sm font-black text-white">🏆 Gesamtes Spiel</div>
+            <div class="text-[11px] text-slate-300 mt-0.5">Mit Punkte-Assistent, automatischer Bonusberechnung & Mitspieler-Verwaltung.</div>
+          </div>
+        </button>
+
+        <!-- MODE 2: PURE DECK -->
+        <button onclick="selectGameMode('pure')" class="w-full bg-slate-700 hover:bg-slate-600 border-2 border-slate-600 p-4 rounded-2xl text-left transition flex items-start space-x-3">
+          <i data-lucide="layers" class="w-7 h-7 text-sky-400 mt-0.5"></i>
+          <div>
+            <div class="text-sm font-black text-white">🃏 Nur Kartenstapel</div>
+            <div class="text-[11px] text-slate-300 mt-0.5">Reiner digitaler 56-Kartenstapel. Punkte werden klassisch auf Papier aufgeschrieben.</div>
+          </div>
+        </button>
+      </div>
+
+      <button onclick="closeModal('modeSelectModal')" id="closeModeBtn" class="hidden w-full bg-slate-700 text-slate-300 font-bold text-xs py-2.5 rounded-xl transition">Schließen</button>
+    </div>
+  </div>
+
+  <!-- MODAL 1: SCOREBOARD & PLAYER RENAMING -->
   <div id="scoreboardModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
     <div class="bg-slate-800 w-full max-w-md rounded-3xl border border-slate-700 p-5 shadow-2xl">
       <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-3">
         <h3 class="text-base font-black text-slate-100 flex items-center">
           <i data-lucide="trophy" class="w-5 h-5 text-amber-400 mr-2"></i>
-          Punktestand (Ziel: <span id="targetScoreText">6000</span> Pkt)
+          Mitspieler & Punkte (Ziel: <span id="targetScoreText">6000</span> Pkt)
         </h3>
         <button onclick="closeModal('scoreboardModal')" class="text-slate-400 hover:text-white">
           <i data-lucide="x" class="w-6 h-6"></i>
         </button>
       </div>
 
-      <!-- PLAYER LIST -->
-      <div id="playerListContainer" class="space-y-2 mb-4 max-h-48 overflow-y-auto">
+      <!-- PLAYER LIST WITH RENAME INPUTS -->
+      <div id="playerListContainer" class="space-y-2 mb-4 max-h-56 overflow-y-auto">
         <!-- Rendered by JS -->
       </div>
 
@@ -244,7 +243,7 @@
         </button>
       </div>
 
-      <button onclick="closeModal('scoreboardModal')" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs py-3 rounded-xl mt-3 transition">Schließen</button>
+      <button onclick="closeModal('scoreboardModal')" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs py-3 rounded-xl mt-3 transition">Fertig & Schließen</button>
     </div>
   </div>
 
@@ -271,7 +270,7 @@
 
   <!-- MODAL 3: WINNER POPUP -->
   <div id="winnerModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-    <div class="bg-emerald-900 border-2 border-emerald-500 w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl animate-bounce">
+    <div class="bg-emerald-900 border-2 border-emerald-500 w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl">
       <i data-lucide="trophy" class="w-16 h-16 text-amber-400 mx-auto mb-2"></i>
       <h2 class="text-3xl font-black text-amber-300">GEWONNEN! 🎉</h2>
       <p id="winnerName" class="text-2xl font-black text-white mt-1">Spieler 1</p>
@@ -280,40 +279,30 @@
     </div>
   </div>
 
-  <!-- APP JAVASCRIPT LOGIC -->
+  <!-- JAVASCRIPT LOGIC -->
   <script>
-    // --- TUTTO DECK DEFINITION (EXACTLY 56 CARDS) ---
     const CARD_TYPES = {
-      BONUS_200: { type: 'bonus_200', title: 'BONUS 200', badge: '+200', bonusVal: 200, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', textAccent: 'text-amber-900', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +200 Bonuspunkte zu deinen Würfelpunkten.' },
-      BONUS_300: { type: 'bonus_300', title: 'BONUS 300', badge: '+300', bonusVal: 300, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', textAccent: 'text-amber-900', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +300 Bonuspunkte zu deinen Würfelpunkten.' },
-      BONUS_400: { type: 'bonus_400', title: 'BONUS 400', badge: '+400', bonusVal: 400, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', textAccent: 'text-amber-900', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +400 Bonuspunkte zu deinen Würfelpunkten.' },
-      BONUS_500: { type: 'bonus_500', title: 'BONUS 500', badge: '+500', bonusVal: 500, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', textAccent: 'text-amber-900', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +500 Bonuspunkte zu deinen Würfelpunkten.' },
-      BONUS_600: { type: 'bonus_600', title: 'BONUS 600', badge: '+600', bonusVal: 600, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', textAccent: 'text-amber-900', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +600 Bonuspunkte zu deinen Würfelpunkten.' },
-      STOPP: { type: 'stopp', title: 'STOPP', badge: 'STOPP', bg: 'bg-red-100', border: 'border-red-600', bannerBg: 'bg-red-600', textAccent: 'text-red-900', icon: 'octagon', desc: 'Pech gehabt! Dein Zug endet sofort mit 0 Punkten.' },
-      FEUERWERK: { type: 'feuerwerk', title: 'FEUERWERK', badge: '🎆', bg: 'bg-orange-100', border: 'border-orange-500', bannerBg: 'bg-orange-500', textAccent: 'text-orange-900', icon: 'flame', desc: 'Du MUSST weiterwürfeln bis zur Niete! EDGE-CASE: Bei Niete behältst du alle bisherigen Punkte!' },
-      STRASSE: { type: 'strasse', title: 'STRAßE', badge: '1 - 6', bonusVal: 2000, bg: 'bg-purple-100', border: 'border-purple-600', bannerBg: 'bg-purple-600', textAccent: 'text-purple-900', icon: 'subway', desc: 'Würfle 1-2-3-4-5-6! Bei Erfolg erhältst du direkt 2.000 Punkte.' },
-      PLUS_MINUS: { type: 'plus_minus', title: 'PLUS / MINUS', badge: '±1000', bonusVal: 1000, bg: 'bg-sky-100', border: 'border-sky-600', bannerBg: 'bg-sky-600', textAccent: 'text-sky-900', icon: 'arrow-right-left', desc: 'Bei Tutto erhältst du 1.000 Pkt. & dem Führenden werden 1.000 Pkt. abgezogen!' },
-      DOUBLE: { type: 'double', title: '×2 VERDOPPELN', badge: '×2', bg: 'bg-emerald-100', border: 'border-emerald-600', bannerBg: 'bg-emerald-600', textAccent: 'text-emerald-900', icon: 'bar-chart-2', desc: 'Bei Tutto werden ALLE deine Würfelpunkte dieses Zuges verdoppelt!' },
-      KLEEBLATT: { type: 'kleeblatt', title: 'KLEEBLATT', badge: '🍀', bg: 'bg-green-100', border: 'border-green-700', bannerBg: 'bg-green-700', textAccent: 'text-green-950', icon: 'clover', desc: 'Schaffst du 2 Tutto in Folge im selben Zug, hast du SOFORT GEWONNEN!' }
+      BONUS_200: { type: 'bonus_200', title: 'BONUS 200', badge: '+200', bonusVal: 200, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +200 Bonuspunkte zu deinen Würfelpunkten.' },
+      BONUS_300: { type: 'bonus_300', title: 'BONUS 300', badge: '+300', bonusVal: 300, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +300 Bonuspunkte zu deinen Würfelpunkten.' },
+      BONUS_400: { type: 'bonus_400', title: 'BONUS 400', badge: '+400', bonusVal: 400, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +400 Bonuspunkte zu deinen Würfelpunkten.' },
+      BONUS_500: { type: 'bonus_500', title: 'BONUS 500', badge: '+500', bonusVal: 500, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +500 Bonuspunkte zu deinen Würfelpunkten.' },
+      BONUS_600: { type: 'bonus_600', title: 'BONUS 600', badge: '+600', bonusVal: 600, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +600 Bonuspunkte zu deinen Würfelpunkten.' },
+      STOPP: { type: 'stopp', title: 'STOPP', badge: 'STOPP', bg: 'bg-red-100', border: 'border-red-600', bannerBg: 'bg-red-600', icon: 'octagon', desc: 'Pech gehabt! Dein Zug endet sofort mit 0 Punkten.' },
+      FEUERWERK: { type: 'feuerwerk', title: 'FEUERWERK', badge: '🎆', bg: 'bg-orange-100', border: 'border-orange-500', bannerBg: 'bg-orange-500', icon: 'flame', desc: 'Du MUSST weiterwürfeln bis zur Niete! EDGE-CASE: Bei Niete behältst du alle bisherigen Punkte!' },
+      STRASSE: { type: 'strasse', title: 'STRAßE', badge: '1 - 6', bonusVal: 2000, bg: 'bg-purple-100', border: 'border-purple-600', bannerBg: 'bg-purple-600', icon: 'subway', desc: 'Würfle 1-2-3-4-5-6! Bei Erfolg erhältst du direkt 2.000 Punkte.' },
+      PLUS_MINUS: { type: 'plus_minus', title: 'PLUS / MINUS', badge: '±1000', bonusVal: 1000, bg: 'bg-sky-100', border: 'border-sky-600', bannerBg: 'bg-sky-600', icon: 'arrow-right-left', desc: 'Bei Tutto erhältst du 1.000 Pkt. & dem Führenden werden 1.000 Pkt. abgezogen!' },
+      DOUBLE: { type: 'double', title: '×2 VERDOPPELN', badge: '×2', bg: 'bg-emerald-100', border: 'border-emerald-600', bannerBg: 'bg-emerald-600', icon: 'bar-chart-2', desc: 'Bei Tutto werden ALLE deine Würfelpunkte dieses Zuges verdoppelt!' },
+      KLEEBLATT: { type: 'kleeblatt', title: 'KLEEBLATT', badge: '🍀', bg: 'bg-green-100', border: 'border-green-700', bannerBg: 'bg-green-700', icon: 'clover', desc: 'Schaffst du 2 Tutto in Folge im selben Zug, hast du SOFORT GEWONNEN!' }
     };
 
     function createFreshDeck() {
       const cards = [];
       let id = 1;
-      const add = (obj, count) => {
-        for (let i = 0; i < count; i++) cards.push({ id: id++, ...obj });
-      };
-      add(CARD_TYPES.BONUS_200, 5);
-      add(CARD_TYPES.BONUS_300, 5);
-      add(CARD_TYPES.BONUS_400, 5);
-      add(CARD_TYPES.BONUS_500, 5);
-      add(CARD_TYPES.BONUS_600, 5);
-      add(CARD_TYPES.STOPP, 10);
-      add(CARD_TYPES.FEUERWERK, 5);
-      add(CARD_TYPES.STRASSE, 5);
-      add(CARD_TYPES.PLUS_MINUS, 5);
-      add(CARD_TYPES.DOUBLE, 5);
-      add(CARD_TYPES.KLEEBLATT, 1);
+      const add = (obj, count) => { for (let i = 0; i < count; i++) cards.push({ id: id++, ...obj }); };
+      add(CARD_TYPES.BONUS_200, 5); add(CARD_TYPES.BONUS_300, 5); add(CARD_TYPES.BONUS_400, 5);
+      add(CARD_TYPES.BONUS_500, 5); add(CARD_TYPES.BONUS_600, 5); add(CARD_TYPES.STOPP, 10);
+      add(CARD_TYPES.FEUERWERK, 5); add(CARD_TYPES.STRASSE, 5); add(CARD_TYPES.PLUS_MINUS, 5);
+      add(CARD_TYPES.DOUBLE, 5); add(CARD_TYPES.KLEEBLATT, 1);
       return shuffle(cards);
     }
 
@@ -327,6 +316,7 @@
     }
 
     // --- GAME STATE ---
+    let gameMode = 'full'; // 'full' or 'pure'
     let drawPile = createFreshDeck();
     let discardPile = [];
     let currentCard = null;
@@ -339,92 +329,154 @@
     let turnScore = 0;
     let targetScore = 6000;
     let kleeblattCount = 0;
+    let isTuttoAchieved = false; // Tracks if TUTTO was hit on current card
 
-    // --- UI UPDATERS ---
+    function selectGameMode(mode) {
+      gameMode = mode;
+      document.getElementById('closeModeBtn').classList.remove('hidden');
+      closeModal('modeSelectModal');
+      
+      if (mode === 'pure') {
+        document.getElementById('playerHeaderPill').classList.add('hidden');
+        document.getElementById('headerTrophyBtn').classList.add('hidden');
+        document.getElementById('deckModeBadge').classList.remove('hidden');
+        document.getElementById('fullGameSection').classList.add('hidden');
+        document.getElementById('pureDeckSection').classList.remove('hidden');
+        document.getElementById('cardBackSubtitle').innerText = 'Tippe hier, um eine Karte zu ziehen';
+      } else {
+        document.getElementById('playerHeaderPill').classList.remove('hidden');
+        document.getElementById('headerTrophyBtn').classList.remove('hidden');
+        document.getElementById('deckModeBadge').classList.add('hidden');
+        document.getElementById('fullGameSection').classList.remove('hidden');
+        document.getElementById('pureDeckSection').classList.add('hidden');
+        // Show scoreboard for player setup if starting fresh
+        openModal('scoreboardModal');
+      }
+      updateUI();
+    }
+
     function updateUI() {
-      const p = players[activePlayerIdx];
+      const p = players[activePlayerIdx] || players[0];
       document.getElementById('activePlayerName').innerText = p.name;
       document.getElementById('activePlayerScore').innerText = `${p.score} Pkt`;
       document.getElementById('deckCounter').innerText = `${drawPile.length} / 56`;
       document.getElementById('turnScoreValue').innerText = turnScore;
 
-      // Card controls visibility
-      if (!currentCard) {
-        document.getElementById('controlsDraw').classList.remove('hidden');
-        document.getElementById('controlsStopp').classList.add('hidden');
-        document.getElementById('controlsSplit').classList.add('hidden');
-        document.getElementById('btnTutto').classList.add('hidden');
-        document.getElementById('diceQuickSection').classList.add('hidden');
-        document.getElementById('btnDrawText').innerText = `KARTE FÜR ${p.name.toUpperCase()} ZIEHEN`;
-      } else if (currentCard.type === 'stopp') {
-        document.getElementById('controlsDraw').classList.add('hidden');
-        document.getElementById('controlsStopp').classList.remove('hidden');
-        document.getElementById('controlsSplit').classList.add('hidden');
-        document.getElementById('btnTutto').classList.add('hidden');
-        document.getElementById('diceQuickSection').classList.add('hidden');
-      } else {
-        document.getElementById('controlsDraw').classList.add('hidden');
-        document.getElementById('controlsStopp').classList.add('hidden');
-        document.getElementById('controlsSplit').classList.remove('hidden');
-        document.getElementById('btnTutto').classList.remove('hidden');
-        document.getElementById('diceQuickSection').classList.remove('hidden');
-      }
-
+      renderControls();
       renderScoreboard();
       renderInspector();
       lucide.createIcons();
+    }
+
+    // DYNAMIC CONTROL BUTTON RENDERER FOR FULL GAME MODE
+    function renderControls() {
+      const container = document.getElementById('controlsContainer');
+      const pName = (players[activePlayerIdx] || players[0]).name;
+
+      if (!currentCard) {
+        document.getElementById('btnTutto').classList.add('hidden');
+        document.getElementById('diceQuickSection').classList.add('hidden');
+        container.innerHTML = `
+          <button onclick="drawCard()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
+            <i data-lucide="arrow-right-circle" class="w-5 h-5"></i>
+            <span>KARTE FÜR ${pName.toUpperCase()} ZIEHEN</span>
+          </button>
+        `;
+      } else if (currentCard.type === 'stopp') {
+        document.getElementById('btnTutto').classList.add('hidden');
+        document.getElementById('diceQuickSection').classList.add('hidden');
+        container.innerHTML = `
+          <button onclick="endTurnStopp()" class="w-full bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
+            <i data-lucide="octagon" class="w-5 h-5"></i>
+            <span>STOPP – ZUG BEENDEN & WEITER</span>
+          </button>
+        `;
+      } else if (isTuttoAchieved) {
+        // AFTER TUTTO: OPTIONS TO DRAW NEXT CARD IN SAME TURN OR BANK POINTS
+        document.getElementById('btnTutto').classList.add('hidden');
+        document.getElementById('diceQuickSection').classList.add('hidden');
+        container.innerHTML = `
+          <div class="space-y-2">
+            <button onclick="drawCardInSameTurn()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-2">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>NÄCHSTE KARTE ZIEHEN (WEITERZOCKEN!)</span>
+            </button>
+            <button onclick="bankPointsAndEnd()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3 rounded-xl shadow transition flex items-center justify-center space-x-2">
+              <i data-lucide="check-circle" class="w-4 h-4"></i>
+              <span>PUNKTE SICHERN & ZUG BEENDEN</span>
+            </button>
+          </div>
+        `;
+      } else {
+        // REGULAR TURN IN PROGRESS
+        document.getElementById('btnTutto').classList.remove('hidden');
+        document.getElementById('diceQuickSection').classList.remove('hidden');
+        container.innerHTML = `
+          <div class="grid grid-cols-2 gap-3">
+            <button onclick="triggerNiete()" class="bg-red-600 hover:bg-red-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-1.5">
+              <i data-lucide="x-circle" class="w-4 h-4"></i>
+              <span>VERZOCKT! (0 PKT)</span>
+            </button>
+            <button onclick="bankPointsAndEnd()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-1.5">
+              <i data-lucide="check-circle" class="w-4 h-4"></i>
+              <span>PUNKTE SICHERN</span>
+            </button>
+          </div>
+        `;
+      }
     }
 
     function showToast(msg) {
       const t = document.getElementById('toastBanner');
       document.getElementById('toastText').innerText = msg;
       t.classList.remove('hidden');
-      setTimeout(() => t.classList.add('hidden'), 3500);
+      setTimeout(() => t.classList.add('hidden'), 4000);
     }
 
-    // --- CARD DRAW LOGIC ---
+    // --- DRAW CARD ---
     function drawCard() {
       if (drawPile.length === 0) {
         if (discardPile.length === 0) drawPile = createFreshDeck();
-        else {
-          drawPile = shuffle(discardPile);
-          discardPile = [];
-        }
+        else { drawPile = shuffle(discardPile); discardPile = []; }
         showToast('🔄 Stapel leer – Karten neu gemischt!');
       }
 
       if (currentCard) discardPile.push(currentCard);
       currentCard = drawPile.pop();
+      isTuttoAchieved = false;
 
       // Update Card Visuals
       const cardFront = document.getElementById('cardFront');
       cardFront.className = `absolute inset-0 backface-hidden rotate-y-180 rounded-3xl border-4 flex flex-col justify-between overflow-hidden shadow-2xl ${currentCard.bg} ${currentCard.border}`;
       
-      const banner = document.getElementById('cardBanner');
-      banner.className = `${currentCard.bannerBg} text-white py-3 text-center`;
-      
-      const badge = document.getElementById('cardBadge');
-      badge.className = `${currentCard.bannerBg} text-white font-black text-2xl px-5 py-1.5 rounded-full mb-3 shadow`;
-      badge.innerText = currentCard.badge;
+      document.getElementById('cardBanner').className = `${currentCard.bannerBg} text-white py-3 text-center`;
+      document.getElementById('cardBadge').className = `${currentCard.bannerBg} text-white font-black text-2xl px-5 py-1.5 rounded-full mb-3 shadow`;
+      document.getElementById('cardBadge').innerText = currentCard.badge;
 
       document.getElementById('cardTitle').innerText = currentCard.title;
       document.getElementById('cardDescription').innerText = currentCard.desc;
       document.getElementById('cardFooterText').innerText = `Karte ${discardPile.length + 1} von 56`;
 
-      // Set Icon
       const iconEl = document.getElementById('cardIcon');
       iconEl.setAttribute('data-lucide', currentCard.icon);
       
-      // Flip Animation
-      const inner = document.getElementById('cardInner');
-      inner.style.transform = 'rotateY(180deg)';
+      document.getElementById('cardInner').style.transform = 'rotateY(180deg)';
 
-      if (currentCard.type === 'stopp') {
+      if (currentCard.type === 'stopp' && gameMode === 'full') {
         showToast('🔴 STOPP-Karte gezogen! Zug endet mit 0 Punkten.');
         turnScore = 0;
       }
 
       updateUI();
+    }
+
+    // DRAW NEXT CARD IN SAME TURN (TUTTO CHAINING)
+    function drawCardInSameTurn() {
+      // Flip back cover briefly then draw
+      document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
+      setTimeout(() => {
+        drawCard();
+      }, 250);
     }
 
     function addDicePoints(pts) {
@@ -433,11 +485,13 @@
       updateUI();
     }
 
-    // --- TUTTO ACTION (BONUS CALCULATION) ---
+    // --- TUTTO ACHIEVED (AUTOMATIC BONUS & CONTINUATION PROMPT) ---
     function triggerTutto() {
-      if (!currentCard) return;
+      if (!currentCard || isTuttoAchieved) return;
 
+      isTuttoAchieved = true;
       let msg = '';
+
       if (currentCard.bonusVal) {
         turnScore += currentCard.bonusVal;
         msg = `+${currentCard.bonusVal} Bonus hinzugefügt!`;
@@ -468,18 +522,19 @@
         }
       }
 
-      showToast(`🎉 TUTTO! ${msg}`);
+      showToast(`🎉 TUTTO! ${msg} Ziehe eine neue Karte zum Weiterzocken oder sichere deine Punkte.`);
       updateUI();
     }
 
-    // --- NIETE / GAMBLE LOST (VERZOCKT) ---
+    // --- NIETE / GAMBLE LOST (ALL TURN POINTS WIPED OUT IN RUN!) ---
     function triggerNiete() {
       if (currentCard && currentCard.type === 'feuerwerk') {
         bankPointsAndEnd(`Feuerwerk beendet! ${turnScore} Punkte gesichert.`);
       } else {
+        const pName = players[activePlayerIdx].name;
         turnScore = 0;
         kleeblattCount = 0;
-        showToast(`💥 VERZOCKT! ${players[activePlayerIdx].name} verliert alle Punkte dieser Runde.`);
+        showToast(`💥 VERZOCKT! ${pName} verliert alle gesammelten Punkte dieser Runde.`);
         nextPlayer();
       }
     }
@@ -506,9 +561,9 @@
       turnScore = 0;
       kleeblattCount = 0;
       currentCard = null;
+      isTuttoAchieved = false;
       activePlayerIdx = (activePlayerIdx + 1) % players.length;
 
-      // Flip card back
       document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
       updateUI();
     }
@@ -519,20 +574,35 @@
       document.getElementById('winnerModal').classList.remove('hidden');
     }
 
-    // --- SCOREBOARD RENDER ---
+    // --- SCOREBOARD RENDER & INLINE PLAYER RENAMING ---
     function renderScoreboard() {
       const container = document.getElementById('playerListContainer');
-      const sorted = [...players].sort((a,b) => b.score - a.score);
       
-      container.innerHTML = sorted.map((p, idx) => `
-        <div class="flex items-center justify-between bg-slate-700/60 p-2.5 rounded-xl border ${players[activePlayerIdx].id === p.id ? 'border-sky-400 bg-slate-700' : 'border-slate-600'}">
-          <div class="flex items-center space-x-2">
+      container.innerHTML = players.map((p, idx) => `
+        <div class="flex items-center justify-between bg-slate-700/60 p-2 rounded-xl border ${players[activePlayerIdx]?.id === p.id ? 'border-sky-400 bg-slate-700' : 'border-slate-600'}">
+          <div class="flex items-center space-x-2 flex-1 mr-2">
             <span class="text-xs font-bold text-slate-400 w-5">#${idx+1}</span>
-            <span class="text-xs font-extrabold text-white">${p.name}</span>
+            <input type="text" value="${escapeHtml(p.name)}" onchange="renamePlayer('${p.id}', this.value)" class="bg-slate-900 border border-slate-600 text-xs font-extrabold text-white px-2 py-1 rounded-lg flex-1 focus:outline-none focus:border-sky-500" />
           </div>
-          <span class="text-xs font-black text-amber-400">${p.score} Pkt</span>
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-black text-amber-400 w-16 text-right">${p.score} Pkt</span>
+            ${players.length > 1 ? `<button onclick="removePlayer('${p.id}')" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
+          </div>
         </div>
       `).join('');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function renamePlayer(id, newName) {
+      if (!newName.trim()) return;
+      const p = players.find(x => x.id === id);
+      if (p) {
+        p.name = newName.trim();
+        updateUI();
+      }
     }
 
     function addPlayer() {
@@ -541,6 +611,13 @@
       if (!val) return;
       players.push({ id: Date.now().toString(), name: val, score: 0 });
       inp.value = '';
+      updateUI();
+    }
+
+    function removePlayer(id) {
+      if (players.length <= 1) return;
+      players = players.filter(p => p.id !== id);
+      if (activePlayerIdx >= players.length) activePlayerIdx = 0;
       updateUI();
     }
 
@@ -557,6 +634,7 @@
       drawPile = createFreshDeck();
       discardPile = [];
       currentCard = null;
+      isTuttoAchieved = false;
       document.getElementById('winnerModal').classList.add('hidden');
       closeModal('scoreboardModal');
       document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
@@ -569,7 +647,6 @@
       }
     }
 
-    // --- INSPECTOR RENDER ---
     function renderInspector() {
       const container = document.getElementById('inspectorList');
       container.innerHTML = Object.values(CARD_TYPES).map(t => {
@@ -583,13 +660,13 @@
       }).join('');
     }
 
-    // --- MODAL HELPERS ---
     function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-    // INITIAL SETUP
     window.onload = () => {
       lucide.createIcons();
+      // Show startup mode selector modal
+      openModal('modeSelectModal');
       updateUI();
     };
   </script>
