@@ -153,7 +153,7 @@
       </button>
     </div>
 
-    <!-- QUICK ADD DICE BUTTONS (FULL MODE) -->
+    <!-- QUICK ADD DICE BUTTONS -->
     <div id="diceQuickSection" class="hidden mb-3">
       <div class="grid grid-cols-4 gap-1.5">
         <button onclick="addDicePoints(50)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+50</button>
@@ -164,23 +164,6 @@
         <button onclick="addDicePoints(500)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+500</button>
         <button onclick="addDicePoints(600)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+600</button>
         <button onclick="addDicePoints(1000)" class="bg-slate-700 hover:bg-slate-600 text-amber-400 font-extrabold text-xs py-2 rounded-lg transition">+1000</button>
-      </div>
-    </div>
-
-    <!-- DICE SIMULATION UI -->
-    <div id="diceSimulationSection" class="hidden mb-3">
-      <div id="simDiceContainer" class="flex flex-wrap justify-center gap-2 mb-2">
-        <!-- Rendered by JS -->
-      </div>
-      <div id="simControls" class="flex flex-col space-y-2">
-        <button id="btnRollDice" onclick="rollDice()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-sm py-3 rounded-xl shadow transition flex items-center justify-center space-x-2">
-          <i data-lucide="dices" class="w-5 h-5"></i>
-          <span>WÜRFELN</span>
-        </button>
-        <button id="btnConfirmDice" onclick="confirmDiceSelection()" class="hidden w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm py-3 rounded-xl shadow transition flex items-center justify-center space-x-2">
-          <i data-lucide="check" class="w-5 h-5"></i>
-          <span>AUSWAHL BESTÄTIGEN</span>
-        </button>
       </div>
     </div>
 
@@ -211,14 +194,6 @@
           <div>
             <div class="text-sm font-black text-white">🏆 Gesamtes Spiel</div>
             <div class="text-[11px] text-slate-300 mt-0.5">Mit Punkte-Assistent, automatischer Bonusberechnung & Mitspieler-Verwaltung.</div>
-          </div>
-        </button>
-
-        <button onclick="selectGameMode('simulation')" class="w-full bg-slate-700 hover:bg-slate-600 border-2 border-emerald-500/80 p-4 rounded-2xl text-left transition flex items-start space-x-3">
-          <i data-lucide="dices" class="w-7 h-7 text-emerald-400 mt-0.5"></i>
-          <div>
-            <div class="text-sm font-black text-white">🎲 Würfelsimulation</div>
-            <div class="text-[11px] text-slate-300 mt-0.5">App übernimmt das Würfeln und die Punktewertung!</div>
           </div>
         </button>
 
@@ -351,63 +326,47 @@
     let targetScore = 6000;
     let kleeblattCount = 0;
     let isTuttoAchieved = false;
-    let simDice = [];
-    let simRollCount = 0;
 
     // --- LOCAL STORAGE SESSION PERSISTENCE ---
-    function getStorageKey(mode) {
-      return 'tutto_app_session_v2_' + mode;
-    }
+    const STORAGE_KEY = 'tutto_app_session_v1';
 
     function saveSession() {
       try {
-        localStorage.setItem('tutto_last_mode', gameMode);
         const state = {
-          gameMode, drawPile, discardPile, currentCard, players,
-          activePlayerIdx, turnScore, targetScore, kleeblattCount, isTuttoAchieved,
-          simDice, simRollCount
+          gameMode,
+          drawPile,
+          discardPile,
+          currentCard,
+          players,
+          activePlayerIdx,
+          turnScore,
+          targetScore,
+          kleeblattCount,
+          isTuttoAchieved,
         };
-        localStorage.setItem(getStorageKey(gameMode), JSON.stringify(state));
-      } catch (e) { console.warn('Session autosave error', e); }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.warn('Session autosave error', e);
+      }
     }
 
-    function resetModeStateToDefaults(mode) {
-      gameMode = mode;
-      drawPile = createFreshDeck();
-      discardPile = [];
-      currentCard = null;
-      players = [
-        { id: '1', name: 'Spieler 1', score: 0 },
-        { id: '2', name: 'Spieler 2', score: 0 }
-      ];
-      activePlayerIdx = 0;
-      turnScore = 0;
-      targetScore = 6000;
-      kleeblattCount = 0;
-      isTuttoAchieved = false;
-      simDice = [];
-      simRollCount = 0;
-    }
-
-    function loadSessionForMode(mode) {
+    function loadSession() {
       try {
-        const raw = localStorage.getItem(getStorageKey(mode));
+        const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return false;
         const state = JSON.parse(raw);
         if (!state || !state.players) return false;
 
-        gameMode = state.gameMode || mode;
+        gameMode = state.gameMode || 'full';
         drawPile = state.drawPile || createFreshDeck();
         discardPile = state.discardPile || [];
         currentCard = state.currentCard || null;
-        players = state.players || [{ id: '1', name: 'Spieler 1', score: 0 }, { id: '2', name: 'Spieler 2', score: 0 }];
+        players = state.players || players;
         activePlayerIdx = state.activePlayerIdx || 0;
         turnScore = state.turnScore || 0;
         targetScore = state.targetScore || 6000;
         kleeblattCount = state.kleeblattCount || 0;
         isTuttoAchieved = state.isTuttoAchieved || false;
-        simDice = state.simDice || [];
-        simRollCount = state.simRollCount || 0;
 
         return true;
       } catch (e) {
@@ -418,193 +377,32 @@
 
     function clearSession() {
       try {
-        localStorage.removeItem(getStorageKey(gameMode));
+        localStorage.removeItem(STORAGE_KEY);
       } catch (e) {}
     }
 
     function selectGameMode(mode) {
-      if (!loadSessionForMode(mode)) {
-        resetModeStateToDefaults(mode);
-      }
       gameMode = mode;
       document.getElementById('closeModeBtn').classList.remove('hidden');
       closeModal('modeSelectModal');
       
-      const elPlayerHeader = document.getElementById('playerHeaderPill');
-      const elHeaderTrophy = document.getElementById('headerTrophyBtn');
-      const elDeckBadge = document.getElementById('deckModeBadge');
-      const elFullSection = document.getElementById('fullGameSection');
-      const elPureSection = document.getElementById('pureDeckSection');
-      const elDiceQuick = document.getElementById('diceQuickSection');
-      const elDiceSim = document.getElementById('diceSimulationSection');
-
       if (mode === 'pure') {
-        elPlayerHeader.classList.add('hidden');
-        elHeaderTrophy.classList.add('hidden');
-        elDeckBadge.classList.remove('hidden');
-        elFullSection.classList.add('hidden');
-        elPureSection.classList.remove('hidden');
+        document.getElementById('playerHeaderPill').classList.add('hidden');
+        document.getElementById('headerTrophyBtn').classList.add('hidden');
+        document.getElementById('deckModeBadge').classList.remove('hidden');
+        document.getElementById('fullGameSection').classList.add('hidden');
+        document.getElementById('pureDeckSection').classList.remove('hidden');
         document.getElementById('cardBackSubtitle').innerText = 'Tippe hier, um eine Karte zu ziehen';
       } else {
-        elPlayerHeader.classList.remove('hidden');
-        elHeaderTrophy.classList.remove('hidden');
-        elDeckBadge.classList.add('hidden');
-        elFullSection.classList.remove('hidden');
-        elPureSection.classList.add('hidden');
-        
-        if (mode === 'simulation') {
-          if (elDiceQuick) elDiceQuick.classList.add('hidden');
-          if (elDiceSim) elDiceSim.classList.remove('hidden');
-        } else {
-          if (elDiceQuick) elDiceQuick.classList.remove('hidden');
-          if (elDiceSim) elDiceSim.classList.add('hidden');
-        }
+        document.getElementById('playerHeaderPill').classList.remove('hidden');
+        document.getElementById('headerTrophyBtn').classList.remove('hidden');
+        document.getElementById('deckModeBadge').classList.add('hidden');
+        document.getElementById('fullGameSection').classList.remove('hidden');
+        document.getElementById('pureDeckSection').classList.add('hidden');
       }
       updateUI();
       saveSession();
     }
-
-    
-    function rollDice() {
-      if (!currentCard || currentCard.type === 'stopp') return;
-      if (simDice.length === 0 || simDice.every(d => d.status === 'locked')) {
-        simDice = [];
-        for (let i = 0; i < 6; i++) {
-          simDice.push({ id: i, value: Math.floor(Math.random() * 6) + 1, status: 'rolling' });
-        }
-      } else {
-        simDice.forEach(d => {
-          if (d.status === 'rolling' || d.status === 'selected') {
-            d.value = Math.floor(Math.random() * 6) + 1;
-            d.status = 'rolling';
-          }
-        });
-      }
-      simRollCount++;
-      
-      if (!hasPossibleScoringCombination()) {
-        renderSimDice();
-        setTimeout(() => { triggerNiete(); }, 1500);
-        return;
-      }
-      updateUI();
-      saveSession();
-    }
-
-    function hasPossibleScoringCombination() {
-      const rolling = simDice.filter(d => d.status === 'rolling').map(d => d.value);
-      if (rolling.length === 0) return true;
-      if (currentCard.type === 'strasse') {
-        const locked = simDice.filter(d => d.status === 'locked').map(d => d.value);
-        for (let v of rolling) if (!locked.includes(v)) return true;
-        return false;
-      }
-      let counts = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0};
-      for (let v of rolling) counts[v]++;
-      if (counts[1] > 0 || counts[5] > 0) return true;
-      for (let v = 2; v <= 6; v++) if (counts[v] >= 3) return true;
-      return false;
-    }
-
-    function toggleDieSelection(id) {
-      const die = simDice.find(d => d.id === id);
-      if (die && die.status !== 'locked') {
-        die.status = die.status === 'selected' ? 'rolling' : 'selected';
-        updateUI();
-      }
-    }
-
-    function confirmDiceSelection() {
-      const selected = simDice.filter(d => d.status === 'selected');
-      if (selected.length === 0) return;
-      const vals = selected.map(d => d.value);
-      const locked = simDice.filter(d => d.status === 'locked').map(d => d.value);
-      
-      if (!isValidSelection(vals, locked)) {
-        showToast('Ungültige Auswahl! Nur 1er, 5er oder Dreierpäsche (bzw. fehlende für Straße).');
-        return;
-      }
-      
-      let add = 0;
-      if (currentCard.type !== 'strasse') add = calculateSelectionScore(vals);
-      
-      selected.forEach(d => d.status = 'locked');
-      turnScore += add;
-      
-      if (simDice.every(d => d.status === 'locked')) {
-        if (currentCard.type === 'strasse') turnScore += 2000;
-        triggerTutto();
-      }
-      
-      updateUI();
-      saveSession();
-    }
-
-    function isValidSelection(vals, locked) {
-      if (vals.length === 0) return false;
-      if (currentCard && currentCard.type === 'strasse') {
-        let comb = [...locked, ...vals];
-        let unq = new Set(comb);
-        return unq.size === comb.length;
-      }
-      let counts = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0};
-      for (let v of vals) counts[v]++;
-      for (let v = 2; v <= 6; v++) {
-        if (v === 5) continue;
-        if (counts[v] % 3 !== 0) return false;
-      }
-      return true;
-    }
-
-    function calculateSelectionScore(vals) {
-      let counts = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0};
-      for (let v of vals) counts[v]++;
-      let score = 0;
-      for (let v = 1; v <= 6; v++) {
-        let c = counts[v];
-        if (c >= 3) {
-          score += Math.floor(c / 3) * (v === 1 ? 1000 : v * 100);
-          c %= 3;
-        }
-        if (v === 1) score += c * 100;
-        if (v === 5) score += c * 50;
-      }
-      return score;
-    }
-
-    function renderSimDice() {
-      const container = document.getElementById('simDiceContainer');
-      const btnRoll = document.getElementById('btnRollDice');
-      const btnConfirm = document.getElementById('btnConfirmDice');
-      if (!container) return;
-      if (simDice.length === 0) {
-        container.innerHTML = `<div class="text-slate-400 text-xs text-center w-full my-2">Bereit zum Würfeln!</div>`;
-        if(btnRoll) btnRoll.classList.remove('hidden');
-        if(btnConfirm) btnConfirm.classList.add('hidden');
-        return;
-      }
-      let allLocked = simDice.every(d => d.status === 'locked');
-      let hasSelected = simDice.some(d => d.status === 'selected');
-      
-      container.innerHTML = simDice.map(d => {
-        let bg = 'bg-slate-700 text-white border-slate-600';
-        if (d.status === 'locked') bg = 'bg-slate-800 text-slate-500 border-slate-700 opacity-60';
-        if (d.status === 'selected') bg = 'bg-emerald-100 text-emerald-800 border-emerald-500 ring-2 ring-emerald-400';
-        return `<button onclick="toggleDieSelection(${d.id})" class="w-12 h-12 flex items-center justify-center rounded-xl border-2 font-black text-xl shadow-sm transition ${bg}">${d.value}</button>`;
-      }).join('');
-      
-      if (allLocked) {
-        if(btnRoll) btnRoll.classList.add('hidden');
-        if(btnConfirm) btnConfirm.classList.add('hidden');
-      } else if (hasSelected) {
-        if(btnRoll) btnRoll.classList.add('hidden');
-        if(btnConfirm) btnConfirm.classList.remove('hidden');
-      } else {
-        if(btnRoll) btnRoll.classList.remove('hidden');
-        if(btnConfirm) btnConfirm.classList.add('hidden');
-      }
-    }
-
 
     function updateUI() {
       const p = players[activePlayerIdx] || players[0];
@@ -635,7 +433,6 @@
       }
 
       renderControls();
-      if (gameMode === 'simulation') renderSimDice();
       renderScoreboard();
       renderInspector();
       lucide.createIcons();
@@ -647,8 +444,7 @@
 
       if (!currentCard) {
         document.getElementById('btnTutto').classList.add('hidden');
-        if(document.getElementById('diceQuickSection')) document.getElementById('diceQuickSection').classList.add('hidden');
-        if(document.getElementById('diceSimulationSection')) document.getElementById('diceSimulationSection').classList.add('hidden');
+        document.getElementById('diceQuickSection').classList.add('hidden');
         container.innerHTML = `
           <button onclick="drawCard()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
             <i data-lucide="arrow-right-circle" class="w-5 h-5"></i>
@@ -656,71 +452,6 @@
           </button>
         `;
       } else if (currentCard.type === 'stopp') {
-        document.getElementById('btnTutto').classList.add('hidden');
-        if(document.getElementById('diceQuickSection')) document.getElementById('diceQuickSection').classList.add('hidden');
-        if(document.getElementById('diceSimulationSection')) document.getElementById('diceSimulationSection').classList.add('hidden');
-        container.innerHTML = `
-          <button onclick="endTurnStopp()" class="w-full bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
-            <i data-lucide="octagon" class="w-5 h-5"></i>
-            <span>STOPP – ZUG BEENDEN & WEITER</span>
-          </button>
-        `;
-      } else if (isTuttoAchieved) {
-        document.getElementById('btnTutto').classList.add('hidden');
-        if(document.getElementById('diceQuickSection')) document.getElementById('diceQuickSection').classList.add('hidden');
-        if(document.getElementById('diceSimulationSection')) document.getElementById('diceSimulationSection').classList.add('hidden');
-        container.innerHTML = `
-          <div class="space-y-2">
-            <button onclick="drawCardInSameTurn()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-2">
-              <i data-lucide="sparkles" class="w-4 h-4"></i>
-              <span>NÄCHSTE KARTE ZIEHEN (WEITERZOCKEN!)</span>
-            </button>
-            <button onclick="bankPointsAndEnd()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3 rounded-xl shadow transition flex items-center justify-center space-x-2">
-              <i data-lucide="check-circle" class="w-4 h-4"></i>
-              <span>PUNKTE SICHERN & ZUG BEENDEN</span>
-            </button>
-          </div>
-        `;
-      } else {
-        if(gameMode === 'simulation') {
-          document.getElementById('btnTutto').classList.add('hidden');
-          if(document.getElementById('diceQuickSection')) document.getElementById('diceQuickSection').classList.add('hidden');
-          if(document.getElementById('diceSimulationSection')) document.getElementById('diceSimulationSection').classList.remove('hidden');
-          
-          let canBank = simDice.some(d => d.status === 'locked') && currentCard.type !== 'feuerwerk' && currentCard.type !== 'strasse';
-          
-          container.innerHTML = `
-            <div class="grid ${canBank ? 'grid-cols-2 gap-3' : 'grid-cols-1'}">
-              ${canBank ? `
-              <button onclick="bankPointsAndEnd()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-1.5">
-                <i data-lucide="check-circle" class="w-4 h-4"></i>
-                <span>PUNKTE SICHERN</span>
-              </button>` : ''}
-              <button onclick="triggerNiete()" class="bg-red-600 hover:bg-red-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-1.5">
-                <i data-lucide="x-circle" class="w-4 h-4"></i>
-                <span>VERZOCKT! (0 PKT)</span>
-              </button>
-            </div>
-          `;
-        } else {
-          document.getElementById('btnTutto').classList.remove('hidden');
-          if(document.getElementById('diceQuickSection')) document.getElementById('diceQuickSection').classList.remove('hidden');
-          if(document.getElementById('diceSimulationSection')) document.getElementById('diceSimulationSection').classList.add('hidden');
-          container.innerHTML = `
-            <div class="grid grid-cols-2 gap-3">
-              <button onclick="triggerNiete()" class="bg-red-600 hover:bg-red-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-1.5">
-                <i data-lucide="x-circle" class="w-4 h-4"></i>
-                <span>VERZOCKT! (0 PKT)</span>
-              </button>
-              <button onclick="bankPointsAndEnd()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-1.5">
-                <i data-lucide="check-circle" class="w-4 h-4"></i>
-                <span>PUNKTE SICHERN</span>
-              </button>
-            </div>
-          `;
-        }
-      }
-    } else if (currentCard.type === 'stopp') {
         document.getElementById('btnTutto').classList.add('hidden');
         document.getElementById('diceQuickSection').classList.add('hidden');
         container.innerHTML = `
@@ -779,10 +510,8 @@
       if (currentCard) discardPile.push(currentCard);
       currentCard = drawPile.pop();
       isTuttoAchieved = false;
-      simDice = [];
-      simRollCount = 0;
 
-      if (currentCard.type === 'stopp' && gameMode !== 'pure') {
+      if (currentCard.type === 'stopp' && gameMode === 'full') {
         showToast('🔴 STOPP-Karte gezogen! Zug endet mit 0 Punkten.');
         turnScore = 0;
       }
@@ -883,8 +612,6 @@
       kleeblattCount = 0;
       currentCard = null;
       isTuttoAchieved = false;
-      simDice = [];
-      simRollCount = 0;
       activePlayerIdx = (activePlayerIdx + 1) % players.length;
 
       document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
@@ -961,8 +688,6 @@
       discardPile = [];
       currentCard = null;
       isTuttoAchieved = false;
-      simDice = [];
-      simRollCount = 0;
       document.getElementById('winnerModal').classList.add('hidden');
       closeModal('scoreboardModal');
       document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
@@ -994,9 +719,12 @@
     window.onload = () => {
       lucide.createIcons();
       
-      const lastMode = localStorage.getItem('tutto_last_mode') || 'full';
-      if (loadSessionForMode(lastMode)) {
-        selectGameMode(lastMode);
+      // Attempt restoring saved session
+      const restored = loadSession();
+      if (restored) {
+        selectGameMode(gameMode);
+        document.getElementById('closeModeBtn').classList.remove('hidden');
+        closeModal('modeSelectModal');
         showToast('💾 Spielstand automatisch wiederhergestellt!');
       } else {
         openModal('modeSelectModal');
