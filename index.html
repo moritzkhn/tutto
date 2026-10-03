@@ -1131,7 +1131,10 @@
           if (selected) cls += 'bg-emerald-600 border-emerald-300 shadow selected ';
           else if (clickable) cls += 'bg-white border-slate-300 hover:border-sky-400 ';
           else cls += 'bg-slate-700 border-slate-600 disabled ';
-          return `<button class="${cls}" onclick="toggleDie(${d.i})">${dieFace(d.v)}</button>`;
+          const content = (!clickable && !selected)
+            ? `<span class="text-2xl font-black text-slate-100">${d.v}</span>`
+            : dieFace(d.v);
+          return `<button class="${cls}" onclick="toggleDie(${d.i})">${content}</button>`;
         }).join('');
       } else {
         const msg = (S.currentCard && S.currentCard.type !== 'stopp')
