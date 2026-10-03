@@ -53,7 +53,7 @@
     .die-face.sm .pip { width: 4px; height: 4px; }
     .die-btn { cursor: pointer; }
     .die-btn.selected .die-face .pip { background: #FFFFFF; }
-    .die-btn.disabled .die-face .pip { background: #94A3B8; }
+    .die-btn.disabled .die-face .pip { background: #64748B; }
   </style>
 </head>
 <body class="flex flex-col h-screen max-w-md mx-auto justify-between bg-slate-900">
@@ -250,7 +250,7 @@
           <i data-lucide="dices" class="w-7 h-7 text-emerald-400 mt-0.5"></i>
           <div>
             <div class="text-sm font-black text-white">🎲 Würfel-Simulation</div>
-            <div class="text-[11px] text-slate-300 mt-0.5">Wie Gesamtes Spiel, aber die App würfelt für dich. Jede 1 & 5 einzeln auswählbar (mind. eine), Dreier-Pässe nur ganz oder gar nicht.</div>
+            <div class="text-[11px] text-slate-300 mt-0.5">Wie Gesamtes Spiel, aber die App würfelt nach offiziellen Regeln: 1 &amp; 5 einzeln, Pásche ganz oder gar nicht, Straße sammelt 1–6, Feuerwerk nimmt alle Werte.</div>
           </div>
         </button>
 
@@ -427,7 +427,7 @@
         activePlayerIdx: 0,
         targetScore: 6000,
         config: mode === 'dice' ? defaultDiceConfig() : {},
-        dice: { currentRoll: [], selected: [], played: [] }
+        dice: { currentRoll: [], selected: [], played: [], street: [] }
       };
     }
 
@@ -492,7 +492,8 @@
           s.dice = {
             currentRoll: Array.isArray(raw.dice.currentRoll) ? raw.dice.currentRoll : [],
             selected: Array.isArray(raw.dice.selected) ? raw.dice.selected : [],
-            played: Array.isArray(raw.dice.played) ? raw.dice.played : []
+            played: Array.isArray(raw.dice.played) ? raw.dice.played : [],
+            street: Array.isArray(raw.dice.street) ? raw.dice.street.map(Number).filter(v => v >= 1 && v <= 6) : []
           };
         }
       }
@@ -529,7 +530,7 @@
     }
 
     function resetDiceState() {
-      S.dice = { currentRoll: [], selected: [], played: [] };
+      S.dice = { currentRoll: [], selected: [], played: [], street: [] };
     }
 
     function selectGameMode(mode) {
@@ -874,6 +875,14 @@
       if (!S.dice.selected.length) {
         return { ok: false, msg: 'Mindestens eine 1, eine 5 oder einen Pasch auswählen!' };
       }
+      // OFFIZIELLE FEUERWERK-REGEL: nach jedem Wurf ALLE gültigen Einzelwürfel & Pásche legen
+      if (S.currentCard && S.currentCard.type === 'feuerwerk') {
+        const req = fireworkRequired(groups);
+        const sameSet = S.dice.selected.length === req.length && req.every(r => S.dice.selected.indexOf(r) !== -1);
+        if (!sameSet) {
+          return { ok: false, msg: '🎆 Feuerwerk: Du musst ALLE 1en, 5en und Pásche rauslegen!' };
+        }
+      }
       const hasFree = (free === undefined) ? hasFreeOneFive(groups) : free;
       for (const g of groups) {
         if (!g.strict) continue;
@@ -892,6 +901,22 @@
       saveSession();
     }
 
+    function isStraightMode() {
+      return gameMode === 'dice' && !!S.currentCard && S.currentCard.type === 'strasse'
+        && !!S.config.streetAutoTutto && S.config.diceCount === 6;
+    }
+
+    function fireworkRequired(groups) {
+      groups = groups || getGroups();
+      const req = [];
+      S.dice.currentRoll.forEach(d => {
+        const inGroup = groups.some(x => x.members.indexOf(d.i) !== -1);
+        const isOneFive = d.v === 1 || d.v === 5;
+        if ((isOneFive || inGroup) && req.indexOf(d.i) === -1) req.push(d.i);
+      });
+      return req;
+    }
+
     function rollDice() {
       if (gameMode !== 'dice') return;
       if (!S.currentCard || S.currentCard.type === 'stopp') {
@@ -901,6 +926,30 @@
       if (S.dice.currentRoll.length) return;
 
       const cfg = S.config;
+
+      // OFFIZIELLE STRAẞEN-REGEL: gültige Würfel sind die 6 verschiedenen Augenzahlen 1–6.
+      // Pro Wurf muss mind. eine noch nicht gesammelte Augenzahl gelegt werden;
+      // ein Wurf ohne neue Augenzahl ist eine Niete.
+      if (isStraightMode()) {
+        const remaining = cfg.diceCount - S.dice.street.length;
+        const svals = [];
+        for (let i = 0; i < remaining; i++) svals.push(1 + Math.floor(Math.random() * 6));
+        S.dice.currentRoll = svals.map((v, i) => ({ i, v }));
+        S.dice.selected = [];
+
+        const hasNew = svals.some(v => S.dice.street.indexOf(v) === -1);
+        if (!hasNew) {
+          showToast('🚂💥 Wurf ohne neue Augenzahl – Straße-Niete!');
+          updateUI();
+          saveSession();
+          setTimeout(() => { applyNieteFromRoll(); }, 1200);
+          return;
+        }
+        updateUI();
+        saveSession();
+        return;
+      }
+
       let remaining = cfg.diceCount - S.dice.played.length;
       if (remaining <= 0) { S.dice.played = []; remaining = cfg.diceCount; }
 
@@ -908,15 +957,6 @@
       for (let i = 0; i < remaining; i++) vals.push(1 + Math.floor(Math.random() * 6));
       S.dice.currentRoll = vals.map((v, i) => ({ i, v }));
       S.dice.selected = [];
-
-      // Straße: 1-2-3-4-5-6 auf frischem vollem Wurf => auto Tutto
-      if (cfg.streetAutoTutto && S.currentCard.type === 'strasse' && remaining === cfg.diceCount && vals.slice().sort().join('') === '123456') {
-        S.dice.played = vals.slice();
-        S.dice.currentRoll = [];
-        showToast('🚂 STRAẞE! 1-2-3-4-5-6 gewürfelt!');
-        triggerTutto();
-        return;
-      }
 
       if (!hasScoringOption()) {
         showToast('💥 Wurf ohne 1/5 und ohne Pasch…');
@@ -933,6 +973,25 @@
     function toggleDie(i) {
       const d = S.dice.currentRoll.find(x => x.i === i);
       if (!d) return;
+
+      // Straße-Modus: pro noch fehlender Augenzahl genau einen Würfel legen
+      if (isStraightMode()) {
+        if (S.dice.street.indexOf(d.v) !== -1) {
+          showToast(`ℹ️ ${d.v} ist bei der Straße bereits gesammelt.`);
+          return;
+        }
+        const idx = S.dice.selected.indexOf(i);
+        if (idx === -1) {
+          const other = S.dice.currentRoll.find(x => x.v === d.v && x.i !== i && S.dice.selected.indexOf(x.i) !== -1);
+          if (other) { showToast('ℹ️ Pro Augenzahl nur einen Würfel legen!'); return; }
+          S.dice.selected.push(i);
+        } else {
+          S.dice.selected.splice(idx, 1);
+        }
+        refreshDice();
+        return;
+      }
+
       const groups = getGroups();
       const g = groups.find(x => x.members.indexOf(i) !== -1);
       const isOneFive = d.v === 1 || d.v === 5;
@@ -976,6 +1035,27 @@
     }
 
     function confirmSelection() {
+      // Straße-Modus: gewählte neue Augenzahlen einheimsen
+      if (isStraightMode()) {
+        if (!S.dice.selected.length) { showToast('⚠️ Straße: Mindestens eine neue Augenzahl auswählen!'); return; }
+        const nums = S.dice.selected
+          .map(i => { const d = S.dice.currentRoll.find(x => x.i === i); return d ? d.v : null; })
+          .filter(v => v !== null);
+        nums.forEach(n => { if (S.dice.street.indexOf(n) === -1) S.dice.street.push(n); });
+        S.dice.currentRoll = [];
+        S.dice.selected = [];
+        if (S.dice.street.length >= 6) {
+          S.dice.played = S.dice.street.slice().sort();
+          showToast('🚂 STRAẞE vollendet – alle Augenzahlen 1–6 gesammelt!');
+          triggerTutto();
+        } else {
+          showToast(`🚂 Straße: ${S.dice.street.length}/6 Augenzahlen gesammelt.`);
+          updateUI();
+          saveSession();
+        }
+        return;
+      }
+
       const groups = getGroups();
       const v = validateSelection(groups);
       if (!v.ok) { showToast('⚠️ ' + v.msg); return; }
@@ -1006,8 +1086,9 @@
       } else {
         S.turnScore = 0;
         S.kleeblattCount = 0;
+        const reason = isStraightMode() ? 'keine neue Augenzahl' : 'keine 1/5 und kein Pasch';
         resetDiceState();
-        showToast('💥 NIETE! Keine 1/5 und kein Pasch – Rundenpunkte verloren.');
+        showToast(`💥 NIETE! ${reason} – Rundenpunkte verloren.`);
         nextPlayer();
       }
     }
@@ -1065,7 +1146,28 @@
         return;
       }
       if (S.dice.currentRoll.length) {
-        if (!hasScoringOption()) {
+        if (isStraightMode()) {
+          const hasNew = S.dice.currentRoll.some(d => S.dice.street.indexOf(d.v) === -1);
+          if (!hasNew) {
+            dc.innerHTML = `
+              <button onclick="applyNieteFromRoll()" class="${btnBase} bg-red-700 hover:bg-red-600 text-white">
+                <i data-lucide="x-circle" class="w-5 h-5"></i>
+                <span>🚂💥 STRAẞE-NIETE! (KEINE NEUE AUGENZAHL)</span>
+              </button>`;
+          } else {
+            const ok = S.dice.selected.length > 0;
+            const nSel = S.dice.selected.filter(i => {
+              const d = S.dice.currentRoll.find(x => x.i === i);
+              return d && S.dice.street.indexOf(d.v) === -1;
+            }).length;
+            dc.innerHTML = `
+              <button onclick="confirmSelection()" class="${btnBase} ${ok ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-slate-600'} text-white">
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
+                <span>NEUE AUGENZAHHLEN LEGEN (${nSel})</span>
+              </button>
+              ${ok ? '' : '<p class="text-[11px] font-bold text-red-300 mt-2 text-center">Mindestens eine noch fehlende Augenzahl antippen!</p>'}`;
+          }
+        } else if (!hasScoringOption()) {
           dc.innerHTML = `
             <button onclick="applyNieteFromRoll()" class="${btnBase} bg-red-700 hover:bg-red-600 text-white">
               <i data-lucide="x-circle" class="w-5 h-5"></i>
@@ -1086,14 +1188,18 @@
       }
 
       // Idle-Phase: würfeln oder sichern
-      const remaining = cfg.diceCount - S.dice.played.length;
+      const remaining = isStraightMode()
+        ? cfg.diceCount - S.dice.street.length
+        : cfg.diceCount - S.dice.played.length;
       let html = `
         <button onclick="rollDice()" class="${btnBase} bg-sky-600 hover:bg-sky-500 text-white">
           <i data-lucide="dice-5" class="w-5 h-5"></i>
           <span>WÜRFELN (${remaining} WÜRFEL)</span>
         </button>`;
-      if (S.currentCard.type === 'feuerwerk') {
-        html += `<p class="text-[11px] font-bold text-orange-300 mt-2 text-center">🎆 Feuerwerk aktiv: Du MUSST bis zur Niete weiterwürfeln!</p>`;
+      if (isStraightMode()) {
+        html += `<p class="text-[11px] font-bold text-purple-300 mt-2 text-center">🚂 Straße-Sammelmodus: ${S.dice.street.length}/6 Augenzahlen – jede neue Zahl zählt, ohne neue Augenzahl ist der Wurf eine Niete.</p>`;
+      } else if (S.currentCard.type === 'feuerwerk') {
+        html += `<p class="text-[11px] font-bold text-orange-300 mt-2 text-center">🎆 Feuerwerk aktiv: Du MUSST alle Wertwürfel legen & bis zur Niete weiterwürfeln!</p>`;
       } else {
         html += `
           <button onclick="bankPointsAndEnd()" class="w-full mt-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-emerald-300 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center space-x-2">
@@ -1113,6 +1219,45 @@
       const info = document.getElementById('diceSelectionInfo');
       const remainBadge = document.getElementById('diceRemainingBadge');
 
+      // --- STRAẞE-SAMMELMODUS (offizielle Regel) ---
+      if (isStraightMode()) {
+        const missing = [];
+        for (let v = 1; v <= 6; v++) if (S.dice.street.indexOf(v) === -1) missing.push(v);
+        remainBadge.innerHTML = `🚂 ${S.dice.street.length}/6 Augenzahlen<br><span class="text-slate-500">${missing.length ? 'fehlt: ' + missing.join(', ') : 'vollständig!'}</span>`;
+
+        playedRow.innerHTML = [1, 2, 3, 4, 5, 6].map(v => {
+          const got = S.dice.street.indexOf(v) !== -1;
+          return `<span class="${got ? 'bg-emerald-600 border-emerald-300' : 'bg-slate-800 border-slate-700 opacity-40'} border rounded-lg px-1 py-1 inline-flex items-center justify-center">${dieFace(v, 'sm')}</span>`;
+        }).join('');
+
+        groupsRow.innerHTML = '';
+
+        if (S.dice.currentRoll.length) {
+          rollRow.innerHTML = S.dice.currentRoll.map(d => {
+            const collected = S.dice.street.indexOf(d.v) !== -1;
+            const dupSel = !collected && S.dice.currentRoll.some(x => x.v === d.v && x.i !== d.i && S.dice.selected.indexOf(x.i) !== -1);
+            const selected = S.dice.selected.indexOf(d.i) !== -1;
+            let cls = 'die-btn flex items-center justify-center rounded-xl border-2 transition w-[48px] h-[48px] ';
+            if (selected) cls += 'bg-emerald-600 border-emerald-300 shadow selected ';
+            else if (collected || dupSel) cls += 'bg-white/50 border-slate-500 disabled ';
+            else cls += 'bg-white border-purple-400 hover:border-purple-600 ';
+            return `<button class="${cls}" onclick="toggleDie(${d.i})">${dieFace(d.v)}</button>`;
+          }).join('');
+          const hasNew = S.dice.currentRoll.some(d => S.dice.street.indexOf(d.v) === -1);
+          info.innerHTML = hasNew
+            ? `<span class="text-purple-300">🚂 Auswahl: ${S.dice.selected.length} neue Augenzahl(en)</span> <span class="text-slate-500">· mind. eine nötig, sonst Niete</span>`
+            : '<span class="text-red-300 font-bold">🚂💥 Keine neue Augenzahl im Wurf – Niete!</span>';
+        } else {
+          const msg = (S.currentCard && S.currentCard.type !== 'stopp')
+            ? 'Tippe auf „Würfeln“.'
+            : 'Erst eine Karte ziehen.';
+          rollRow.innerHTML = `<span class="text-[11px] text-slate-500 italic">${msg}</span>`;
+          info.innerHTML = '';
+        }
+        return;
+      }
+
+      // --- NORMALER WÜRFELMODUS ---
       const remaining = cfg.diceCount - S.dice.played.length;
       remainBadge.innerHTML = `${S.dice.played.length}/${cfg.diceCount} rausgelegt<br><span class="text-slate-500">${remaining > 0 ? remaining + ' Würfel übrig' : 'alle Würfel gespielt'}</span>`;
 
@@ -1132,7 +1277,7 @@
           if (selected) cls += 'bg-emerald-600 border-emerald-300 shadow selected ';
           else if (g) cls += 'bg-white border-amber-500/70 hover:border-amber-400 ';
           else if (isOneFive) cls += 'bg-white border-slate-300 hover:border-sky-400 ';
-          else cls += 'bg-slate-700 border-slate-600 disabled ';
+          else cls += 'bg-white/50 border-slate-500 disabled ';
           return `<button class="${cls}" onclick="toggleDie(${d.i})">${dieFace(d.v)}</button>`;
         }).join('');
       } else {
@@ -1325,7 +1470,7 @@
         </label>`;
         html += `<label class="flex items-start space-x-2 bg-slate-700/50 rounded-xl p-3 cursor-pointer">
           <input type="checkbox" ${c.streetAutoTutto ? 'checked' : ''} onchange="applyConfig('dice.streetAutoTutto', this.checked)" class="mt-0.5">
-          <span class="text-[11px] font-bold text-slate-200">Straße-Karte: Wurf 1-2-3-4-5-6 automatisch als Tutto (+2.000) werten</span>
+          <span class="text-[11px] font-bold text-slate-200">Straße-Karte nach offiziellen Regeln: Augenzahlen 1–6 über mehrere Würfe sammeln – jede neue Zahl muss gelegt werden, Wurf ohne neue Zahl = Niete, vollständig = +2.000 &amp; Tutto</span>
         </label>`;
         html += '<p class="text-[10px] text-slate-500 leading-relaxed">Pasch-Wertung: 3 Gleiche = konfigurierter Wert, jeder weitere gleiche Würfel zählt wie ein zusätzlicher Pasch (4× = 2-fach usw.).</p>';
       }
