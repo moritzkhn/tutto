@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Tutto! Kartenstapel & Punktezähler</title>
+  
+  <!-- PWA & Mobile Web App Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Tutto!" />
+  <meta name="theme-color" content="#0F172A" />
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Tailwind CSS CDN for modern UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      background-color: #0F172A;
+      color: #F8FAFC;
+      overflow-x: hidden;
+    }
+    
+    /* 3D Card Flip Animation Styles */
+    .perspective-1000 {
+      perspective: 1000px;
+    }
+    .transform-style-3d {
+      transform-style: preserve-3d;
+    }
+    .backface-hidden {
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    .rotate-y-180 {
+      transform: rotateY(180deg);
+    }
+    
+    .card-transition {
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1E293B;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="flex flex-col h-screen max-w-md mx-auto justify-between bg-slate-900">
+
+  <!-- TOP HEADER & PLAYER BAR -->
+  <header class="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between shadow-md">
+    <button onclick="openModal('scoreboardModal')" class="flex items-center bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-full border border-slate-600 transition">
+      <i data-lucide="user-check" class="w-5 h-5 text-sky-400 mr-2"></i>
+      <div class="text-left">
+        <div class="text-[10px] text-slate-400 font-bold uppercase leading-tight">Am Zug</div>
+        <div id="activePlayerName" class="text-sm font-extrabold text-slate-100 leading-tight">Spieler 1</div>
+      </div>
+      <span id="activePlayerScore" class="ml-3 bg-sky-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">0 Pkt</span>
+    </button>
+
+    <div class="flex items-center space-x-2">
+      <button onclick="openModal('inspectorModal')" class="flex items-center bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-full border border-slate-600 text-slate-300 text-xs font-bold transition">
+        <i data-lucide="layers" class="w-4 h-4 mr-1 text-slate-400"></i>
+        <span id="deckCounter">56 / 56</span>
+      </button>
+
+      <button onclick="openModal('scoreboardModal')" class="p-2 text-slate-300 hover:text-white transition">
+        <i data-lucide="trophy" class="w-5 h-5 text-amber-400"></i>
+      </button>
+
+      <button onclick="resetGamePrompt()" class="p-2 text-slate-300 hover:text-white transition">
+        <i data-lucide="rotate-ccw" class="w-5 h-5 text-slate-400"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- TOAST BANNER -->
+  <div id="toastBanner" class="hidden bg-blue-600 text-white text-xs font-bold py-2 px-4 text-center transition-all animate-pulse">
+    <span id="toastText">Hinweis</span>
+  </div>
+
+  <!-- MAIN CARD AREA -->
+  <main class="flex-1 flex flex-col items-center justify-center p-4 relative">
+    
+    <!-- CARD CONTAINER (FLIP ANIMATION) -->
+    <div class="w-full max-w-xs h-[360px] perspective-1000">
+      <div id="cardInner" class="w-full h-full relative transform-style-3d card-transition rounded-3xl shadow-2xl">
+        
+        <!-- CARD BACK (COVER) -->
+        <div onclick="drawCard()" class="absolute inset-0 backface-hidden bg-slate-800 border-4 border-dashed border-slate-700 rounded-3xl flex flex-col items-center justify-center p-6 text-center cursor-pointer hover:border-slate-500 transition">
+          <div class="w-20 h-20 bg-slate-700/50 rounded-full flex items-center justify-center mb-4 border border-slate-600">
+            <i data-lucide="square" class="w-10 h-10 text-slate-400"></i>
+          </div>
+          <h1 class="text-3xl font-black tracking-wider text-slate-100 mb-1">TUTTO!</h1>
+          <p class="text-xs text-slate-400 font-semibold mb-6">Tippe hier, um die Karte zu ziehen</p>
+          <span class="bg-slate-700 text-sky-400 text-xs font-bold px-4 py-1.5 rounded-full border border-slate-600">56 Karten im Stapel</span>
+        </div>
+
+        <!-- CARD FRONT (FACE) -->
+        <div id="cardFront" class="absolute inset-0 backface-hidden rotate-y-180 rounded-3xl border-4 flex flex-col justify-between overflow-hidden shadow-2xl bg-amber-50 border-amber-500">
+          
+          <!-- CARD HEADER BANNER -->
+          <div id="cardBanner" class="bg-amber-500 text-white py-3 text-center">
+            <h2 id="cardTitle" class="text-xl font-black tracking-wider uppercase">BONUS 500</h2>
+          </div>
+
+          <!-- CARD BODY -->
+          <div class="flex-1 flex flex-col items-center justify-center p-4 text-center">
+            <div id="cardBadge" class="bg-amber-500 text-white font-black text-2xl px-5 py-1.5 rounded-full mb-3 shadow">
+              +500
+            </div>
+            
+            <div id="cardIconContainer" class="my-2">
+              <i id="cardIcon" data-lucide="gift" class="w-16 h-16 text-amber-600"></i>
+            </div>
+
+            <div class="bg-white/80 backdrop-blur border border-amber-200 rounded-2xl p-3.5 mt-2 shadow-sm">
+              <p id="cardDescription" class="text-xs font-bold text-amber-900 leading-relaxed">
+                Erzielst du ein Tutto, erhältst du zusätzlich 500 Punkte zu deinen Würfelpunkten.
+              </p>
+            </div>
+          </div>
+
+          <!-- CARD FOOTER -->
+          <div class="bg-black/10 py-2 text-center">
+            <span id="cardFooterText" class="text-[11px] font-bold text-slate-700">Karte 1 von 56</span>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- SCORE ASSISTANT & TURN TRACKER -->
+  <section class="bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg">
+    
+    <!-- TURN SCORE DISPLAY -->
+    <div class="bg-slate-900 rounded-2xl p-3 border border-slate-700 text-center mb-3 flex items-center justify-between px-5">
+      <div>
+        <div class="text-[10px] text-slate-400 font-extrabold tracking-wider uppercase">Punkte dieser Runde</div>
+        <div id="turnScoreValue" class="text-3xl font-black text-amber-400 leading-tight">0</div>
+      </div>
+
+      <!-- TUTTO BUTTON -->
+      <button id="btnTutto" onclick="triggerTutto()" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-4 py-2.5 rounded-xl shadow transition flex items-center space-x-1.5">
+        <i data-lucide="sparkles" class="w-4 h-4"></i>
+        <span>TUTTO!</span>
+      </button>
+    </div>
+
+    <!-- QUICK ADD DICE BUTTONS -->
+    <div id="diceQuickSection" class="hidden mb-3">
+      <div class="flex items-center justify-between text-[10px] font-extrabold text-slate-400 uppercase mb-2">
+        <span>Würfelpunkte hinzufügen:</span>
+      </div>
+      <div class="grid grid-cols-4 gap-1.5 mb-2">
+        <button onclick="addDicePoints(50)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+50</button>
+        <button onclick="addDicePoints(100)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+100</button>
+        <button onclick="addDicePoints(200)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+200</button>
+        <button onclick="addDicePoints(300)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+300</button>
+        <button onclick="addDicePoints(400)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+400</button>
+        <button onclick="addDicePoints(500)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+500</button>
+        <button onclick="addDicePoints(600)" class="bg-slate-700 hover:bg-slate-600 text-sky-400 font-extrabold text-xs py-2 rounded-lg transition">+600</button>
+        <button onclick="addDicePoints(1000)" class="bg-slate-700 hover:bg-slate-600 text-amber-400 font-extrabold text-xs py-2 rounded-lg transition">+1000</button>
+      </div>
+    </div>
+
+    <!-- BOTTOM PRIMARY ACTION BUTTONS -->
+    <div id="controlsDraw" class="flex">
+      <button onclick="drawCard()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
+        <i data-lucide="arrow-right-circle" class="w-5 h-5"></i>
+        <span id="btnDrawText">KARTE ZIEHEN</span>
+      </button>
+    </div>
+
+    <div id="controlsStopp" class="hidden flex">
+      <button onclick="endTurnStopp()" class="w-full bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
+        <i data-lucide="octagon" class="w-5 h-5"></i>
+        <span>STOPP – NÄCHSTER SPIELER</span>
+      </button>
+    </div>
+
+    <div id="controlsSplit" class="hidden grid grid-cols-2 gap-3">
+      <!-- NIETE / GAMBLE LOST -->
+      <button onclick="triggerNiete()" class="bg-red-600 hover:bg-red-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-1.5">
+        <i data-lucide="x-circle" class="w-4 h-4"></i>
+        <span>VERZOCKT! (0 PKT)</span>
+      </button>
+
+      <!-- BANK POINTS & END TURN -->
+      <button onclick="bankPointsAndEnd()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3.5 rounded-xl shadow transition flex items-center justify-center space-x-1.5">
+        <i data-lucide="check-circle" class="w-4 h-4"></i>
+        <span>PUNKTE SICHERN</span>
+      </button>
+    </div>
+
+  </section>
+
+  <!-- MODAL 1: SCOREBOARD & PLAYERS -->
+  <div id="scoreboardModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+    <div class="bg-slate-800 w-full max-w-md rounded-3xl border border-slate-700 p-5 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-3">
+        <h3 class="text-base font-black text-slate-100 flex items-center">
+          <i data-lucide="trophy" class="w-5 h-5 text-amber-400 mr-2"></i>
+          Punktestand (Ziel: <span id="targetScoreText">6000</span> Pkt)
+        </h3>
+        <button onclick="closeModal('scoreboardModal')" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <!-- PLAYER LIST -->
+      <div id="playerListContainer" class="space-y-2 mb-4 max-h-48 overflow-y-auto">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- ADD PLAYER & RESET -->
+      <div class="border-t border-slate-700 pt-3">
+        <div class="flex space-x-2 mb-3">
+          <input id="newPlayerInput" type="text" placeholder="Neuer Spieler Name..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500" />
+          <button onclick="addPlayer()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 rounded-xl transition">+ Hinzufügen</button>
+        </div>
+
+        <button onclick="resetScoresConfirm()" class="w-full text-red-400 hover:text-red-300 text-xs font-bold py-1.5 flex items-center justify-center space-x-1">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          <span>Punkte & Spiel zurücksetzen</span>
+        </button>
+      </div>
+
+      <button onclick="closeModal('scoreboardModal')" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs py-3 rounded-xl mt-3 transition">Schließen</button>
+    </div>
+  </div>
+
+  <!-- MODAL 2: DECK INSPECTOR -->
+  <div id="inspectorModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+    <div class="bg-slate-800 w-full max-w-md rounded-3xl border border-slate-700 p-5 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-3">
+        <h3 class="text-base font-black text-slate-100 flex items-center">
+          <i data-lucide="layers" class="w-5 h-5 text-sky-400 mr-2"></i>
+          Verbleibende Karten im Stapel
+        </h3>
+        <button onclick="closeModal('inspectorModal')" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <div id="inspectorList" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+        <!-- Rendered by JS -->
+      </div>
+
+      <button onclick="closeModal('inspectorModal')" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs py-3 rounded-xl mt-4 transition">Schließen</button>
+    </div>
+  </div>
+
+  <!-- MODAL 3: WINNER POPUP -->
+  <div id="winnerModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-emerald-900 border-2 border-emerald-500 w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl animate-bounce">
+      <i data-lucide="trophy" class="w-16 h-16 text-amber-400 mx-auto mb-2"></i>
+      <h2 class="text-3xl font-black text-amber-300">GEWONNEN! 🎉</h2>
+      <p id="winnerName" class="text-2xl font-black text-white mt-1">Spieler 1</p>
+      <p id="winnerReason" class="text-xs font-bold text-emerald-200 mt-2">6000 Punkte erreicht!</p>
+      <button onclick="resetGameFull()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm py-3.5 rounded-2xl mt-6 shadow transition">Neues Spiel starten</button>
+    </div>
+  </div>
+
+  <!-- APP JAVASCRIPT LOGIC -->
+  <script>
+    // --- TUTTO DECK DEFINITION (EXACTLY 56 CARDS) ---
+    const CARD_TYPES = {
+      BONUS_200: { type: 'bonus_200', title: 'BONUS 200', badge: '+200', bonusVal: 200, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', textAccent: 'text-amber-900', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +200 Bonuspunkte zu deinen Würfelpunkten.' },
+      BONUS_300: { type: 'bonus_300', title: 'BONUS 300', badge: '+300', bonusVal: 300, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', textAccent: 'text-amber-900', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +300 Bonuspunkte zu deinen Würfelpunkten.' },
+      BONUS_400: { type: 'bonus_400', title: 'BONUS 400', badge: '+400', bonusVal: 400, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', textAccent: 'text-amber-900', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +400 Bonuspunkte zu deinen Würfelpunkten.' },
+      BONUS_500: { type: 'bonus_500', title: 'BONUS 500', badge: '+500', bonusVal: 500, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', textAccent: 'text-amber-900', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +500 Bonuspunkte zu deinen Würfelpunkten.' },
+      BONUS_600: { type: 'bonus_600', title: 'BONUS 600', badge: '+600', bonusVal: 600, bg: 'bg-amber-100', border: 'border-amber-500', bannerBg: 'bg-amber-500', textAccent: 'text-amber-900', icon: 'gift', desc: 'Erzielst du ein Tutto, erhältst du +600 Bonuspunkte zu deinen Würfelpunkten.' },
+      STOPP: { type: 'stopp', title: 'STOPP', badge: 'STOPP', bg: 'bg-red-100', border: 'border-red-600', bannerBg: 'bg-red-600', textAccent: 'text-red-900', icon: 'octagon', desc: 'Pech gehabt! Dein Zug endet sofort mit 0 Punkten.' },
+      FEUERWERK: { type: 'feuerwerk', title: 'FEUERWERK', badge: '🎆', bg: 'bg-orange-100', border: 'border-orange-500', bannerBg: 'bg-orange-500', textAccent: 'text-orange-900', icon: 'flame', desc: 'Du MUSST weiterwürfeln bis zur Niete! EDGE-CASE: Bei Niete behältst du alle bisherigen Punkte!' },
+      STRASSE: { type: 'strasse', title: 'STRAßE', badge: '1 - 6', bonusVal: 2000, bg: 'bg-purple-100', border: 'border-purple-600', bannerBg: 'bg-purple-600', textAccent: 'text-purple-900', icon: 'subway', desc: 'Würfle 1-2-3-4-5-6! Bei Erfolg erhältst du direkt 2.000 Punkte.' },
+      PLUS_MINUS: { type: 'plus_minus', title: 'PLUS / MINUS', badge: '±1000', bonusVal: 1000, bg: 'bg-sky-100', border: 'border-sky-600', bannerBg: 'bg-sky-600', textAccent: 'text-sky-900', icon: 'arrow-right-left', desc: 'Bei Tutto erhältst du 1.000 Pkt. & dem Führenden werden 1.000 Pkt. abgezogen!' },
+      DOUBLE: { type: 'double', title: '×2 VERDOPPELN', badge: '×2', bg: 'bg-emerald-100', border: 'border-emerald-600', bannerBg: 'bg-emerald-600', textAccent: 'text-emerald-900', icon: 'bar-chart-2', desc: 'Bei Tutto werden ALLE deine Würfelpunkte dieses Zuges verdoppelt!' },
+      KLEEBLATT: { type: 'kleeblatt', title: 'KLEEBLATT', badge: '🍀', bg: 'bg-green-100', border: 'border-green-700', bannerBg: 'bg-green-700', textAccent: 'text-green-950', icon: 'clover', desc: 'Schaffst du 2 Tutto in Folge im selben Zug, hast du SOFORT GEWONNEN!' }
+    };
+
+    function createFreshDeck() {
+      const cards = [];
+      let id = 1;
+      const add = (obj, count) => {
+        for (let i = 0; i < count; i++) cards.push({ id: id++, ...obj });
+      };
+      add(CARD_TYPES.BONUS_200, 5);
+      add(CARD_TYPES.BONUS_300, 5);
+      add(CARD_TYPES.BONUS_400, 5);
+      add(CARD_TYPES.BONUS_500, 5);
+      add(CARD_TYPES.BONUS_600, 5);
+      add(CARD_TYPES.STOPP, 10);
+      add(CARD_TYPES.FEUERWERK, 5);
+      add(CARD_TYPES.STRASSE, 5);
+      add(CARD_TYPES.PLUS_MINUS, 5);
+      add(CARD_TYPES.DOUBLE, 5);
+      add(CARD_TYPES.KLEEBLATT, 1);
+      return shuffle(cards);
+    }
+
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    // --- GAME STATE ---
+    let drawPile = createFreshDeck();
+    let discardPile = [];
+    let currentCard = null;
+    
+    let players = [
+      { id: '1', name: 'Spieler 1', score: 0 },
+      { id: '2', name: 'Spieler 2', score: 0 }
+    ];
+    let activePlayerIdx = 0;
+    let turnScore = 0;
+    let targetScore = 6000;
+    let kleeblattCount = 0;
+
+    // --- UI UPDATERS ---
+    function updateUI() {
+      const p = players[activePlayerIdx];
+      document.getElementById('activePlayerName').innerText = p.name;
+      document.getElementById('activePlayerScore').innerText = `${p.score} Pkt`;
+      document.getElementById('deckCounter').innerText = `${drawPile.length} / 56`;
+      document.getElementById('turnScoreValue').innerText = turnScore;
+
+      // Card controls visibility
+      if (!currentCard) {
+        document.getElementById('controlsDraw').classList.remove('hidden');
+        document.getElementById('controlsStopp').classList.add('hidden');
+        document.getElementById('controlsSplit').classList.add('hidden');
+        document.getElementById('btnTutto').classList.add('hidden');
+        document.getElementById('diceQuickSection').classList.add('hidden');
+        document.getElementById('btnDrawText').innerText = `KARTE FÜR ${p.name.toUpperCase()} ZIEHEN`;
+      } else if (currentCard.type === 'stopp') {
+        document.getElementById('controlsDraw').classList.add('hidden');
+        document.getElementById('controlsStopp').classList.remove('hidden');
+        document.getElementById('controlsSplit').classList.add('hidden');
+        document.getElementById('btnTutto').classList.add('hidden');
+        document.getElementById('diceQuickSection').classList.add('hidden');
+      } else {
+        document.getElementById('controlsDraw').classList.add('hidden');
+        document.getElementById('controlsStopp').classList.add('hidden');
+        document.getElementById('controlsSplit').classList.remove('hidden');
+        document.getElementById('btnTutto').classList.remove('hidden');
+        document.getElementById('diceQuickSection').classList.remove('hidden');
+      }
+
+      renderScoreboard();
+      renderInspector();
+      lucide.createIcons();
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toastBanner');
+      document.getElementById('toastText').innerText = msg;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 3500);
+    }
+
+    // --- CARD DRAW LOGIC ---
+    function drawCard() {
+      if (drawPile.length === 0) {
+        if (discardPile.length === 0) drawPile = createFreshDeck();
+        else {
+          drawPile = shuffle(discardPile);
+          discardPile = [];
+        }
+        showToast('🔄 Stapel leer – Karten neu gemischt!');
+      }
+
+      if (currentCard) discardPile.push(currentCard);
+      currentCard = drawPile.pop();
+
+      // Update Card Visuals
+      const cardFront = document.getElementById('cardFront');
+      cardFront.className = `absolute inset-0 backface-hidden rotate-y-180 rounded-3xl border-4 flex flex-col justify-between overflow-hidden shadow-2xl ${currentCard.bg} ${currentCard.border}`;
+      
+      const banner = document.getElementById('cardBanner');
+      banner.className = `${currentCard.bannerBg} text-white py-3 text-center`;
+      
+      const badge = document.getElementById('cardBadge');
+      badge.className = `${currentCard.bannerBg} text-white font-black text-2xl px-5 py-1.5 rounded-full mb-3 shadow`;
+      badge.innerText = currentCard.badge;
+
+      document.getElementById('cardTitle').innerText = currentCard.title;
+      document.getElementById('cardDescription').innerText = currentCard.desc;
+      document.getElementById('cardFooterText').innerText = `Karte ${discardPile.length + 1} von 56`;
+
+      // Set Icon
+      const iconEl = document.getElementById('cardIcon');
+      iconEl.setAttribute('data-lucide', currentCard.icon);
+      
+      // Flip Animation
+      const inner = document.getElementById('cardInner');
+      inner.style.transform = 'rotateY(180deg)';
+
+      if (currentCard.type === 'stopp') {
+        showToast('🔴 STOPP-Karte gezogen! Zug endet mit 0 Punkten.');
+        turnScore = 0;
+      }
+
+      updateUI();
+    }
+
+    function addDicePoints(pts) {
+      if (!currentCard || currentCard.type === 'stopp') return;
+      turnScore += pts;
+      updateUI();
+    }
+
+    // --- TUTTO ACTION (BONUS CALCULATION) ---
+    function triggerTutto() {
+      if (!currentCard) return;
+
+      let msg = '';
+      if (currentCard.bonusVal) {
+        turnScore += currentCard.bonusVal;
+        msg = `+${currentCard.bonusVal} Bonus hinzugefügt!`;
+      } else if (currentCard.type === 'double') {
+        turnScore = turnScore * 2;
+        msg = `Punkte verdoppelt (×2)!`;
+      } else if (currentCard.type === 'plus_minus') {
+        turnScore += 1000;
+        let max = -1, leaderIdx = -1;
+        players.forEach((p, idx) => {
+          if (idx !== activePlayerIdx && p.score > max && p.score > 0) {
+            max = p.score; leaderIdx = idx;
+          }
+        });
+        if (leaderIdx !== -1) {
+          players[leaderIdx].score = Math.max(0, players[leaderIdx].score - 1000);
+          msg = `+1000 Pkt! Führender (${players[leaderIdx].name}) verliert 1.000 Pkt.`;
+        } else {
+          msg = `+1000 Pkt!`;
+        }
+      } else if (currentCard.type === 'kleeblatt') {
+        kleeblattCount++;
+        if (kleeblattCount >= 2) {
+          showWinner(players[activePlayerIdx].name, '🍀 SOFORT-SIEG durch 2x Tutto bei Kleeblatt!');
+          return;
+        } else {
+          msg = `1 von 2 Tuttos geschafft! Noch 1 Tutto für den SOFORT-SIEG!`;
+        }
+      }
+
+      showToast(`🎉 TUTTO! ${msg}`);
+      updateUI();
+    }
+
+    // --- NIETE / GAMBLE LOST (VERZOCKT) ---
+    function triggerNiete() {
+      if (currentCard && currentCard.type === 'feuerwerk') {
+        bankPointsAndEnd(`Feuerwerk beendet! ${turnScore} Punkte gesichert.`);
+      } else {
+        turnScore = 0;
+        kleeblattCount = 0;
+        showToast(`💥 VERZOCKT! ${players[activePlayerIdx].name} verliert alle Punkte dieser Runde.`);
+        nextPlayer();
+      }
+    }
+
+    function bankPointsAndEnd(customMsg) {
+      players[activePlayerIdx].score += turnScore;
+      const banked = turnScore;
+      const pName = players[activePlayerIdx].name;
+      
+      if (players[activePlayerIdx].score >= targetScore) {
+        showWinner(pName, `Zielpunktzahl von ${targetScore} Punkten erreicht!`);
+        return;
+      }
+
+      showToast(customMsg || `✅ ${pName}: ${banked} Punkte gesichert!`);
+      nextPlayer();
+    }
+
+    function endTurnStopp() {
+      nextPlayer();
+    }
+
+    function nextPlayer() {
+      turnScore = 0;
+      kleeblattCount = 0;
+      currentCard = null;
+      activePlayerIdx = (activePlayerIdx + 1) % players.length;
+
+      // Flip card back
+      document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
+      updateUI();
+    }
+
+    function showWinner(name, reason) {
+      document.getElementById('winnerName').innerText = name;
+      document.getElementById('winnerReason').innerText = reason;
+      document.getElementById('winnerModal').classList.remove('hidden');
+    }
+
+    // --- SCOREBOARD RENDER ---
+    function renderScoreboard() {
+      const container = document.getElementById('playerListContainer');
+      const sorted = [...players].sort((a,b) => b.score - a.score);
+      
+      container.innerHTML = sorted.map((p, idx) => `
+        <div class="flex items-center justify-between bg-slate-700/60 p-2.5 rounded-xl border ${players[activePlayerIdx].id === p.id ? 'border-sky-400 bg-slate-700' : 'border-slate-600'}">
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold text-slate-400 w-5">#${idx+1}</span>
+            <span class="text-xs font-extrabold text-white">${p.name}</span>
+          </div>
+          <span class="text-xs font-black text-amber-400">${p.score} Pkt</span>
+        </div>
+      `).join('');
+    }
+
+    function addPlayer() {
+      const inp = document.getElementById('newPlayerInput');
+      const val = inp.value.trim();
+      if (!val) return;
+      players.push({ id: Date.now().toString(), name: val, score: 0 });
+      inp.value = '';
+      updateUI();
+    }
+
+    function resetScoresConfirm() {
+      if (confirm('Möchtest du alle Punkte und das Spiel wirklich zurücksetzen?')) {
+        resetGameFull();
+      }
+    }
+
+    function resetGameFull() {
+      players.forEach(p => p.score = 0);
+      activePlayerIdx = 0;
+      turnScore = 0;
+      drawPile = createFreshDeck();
+      discardPile = [];
+      currentCard = null;
+      document.getElementById('winnerModal').classList.add('hidden');
+      closeModal('scoreboardModal');
+      document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
+      updateUI();
+    }
+
+    function resetGamePrompt() {
+      if (confirm('Neues Spiel starten und den Stapel neu mischen?')) {
+        resetGameFull();
+      }
+    }
+
+    // --- INSPECTOR RENDER ---
+    function renderInspector() {
+      const container = document.getElementById('inspectorList');
+      container.innerHTML = Object.values(CARD_TYPES).map(t => {
+        const count = drawPile.filter(c => c.type === t.type).length;
+        return `
+          <div class="flex items-center justify-between bg-slate-700/50 p-2 rounded-xl text-xs">
+            <span class="font-bold text-slate-200">${t.title}</span>
+            <span class="font-extrabold text-sky-400">${count} übrig</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // --- MODAL HELPERS ---
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    // INITIAL SETUP
+    window.onload = () => {
+      lucide.createIcons();
+      updateUI();
+    };
+  </script>
+</body>
+</html>
