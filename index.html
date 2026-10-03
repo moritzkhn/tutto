@@ -37,6 +37,23 @@
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: #1E293B; }
     ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+
+    /* --- DICE SIMULATION --- */
+    .die-face {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      width: 30px; height: 30px;
+      gap: 2px;
+      justify-items: center; align-items: center;
+    }
+    .die-face .pip { width: 6px; height: 6px; border-radius: 9999px; background: #1E293B; }
+    .die-face .pip.empty { background: transparent; }
+    .die-face.sm { width: 18px; height: 18px; gap: 1px; }
+    .die-face.sm .pip { width: 4px; height: 4px; }
+    .die-btn { cursor: pointer; }
+    .die-btn.selected .die-face .pip { background: #FFFFFF; }
+    .die-btn.disabled .die-face .pip { background: #94A3B8; }
   </style>
 </head>
 <body class="flex flex-col h-screen max-w-md mx-auto justify-between bg-slate-900">
@@ -65,6 +82,10 @@
         <i data-lucide="settings" class="w-4 h-4 text-slate-300"></i>
       </button>
 
+      <button onclick="openSettingsModal()" title="Einstellungen des aktuellen Modus" class="p-2 text-slate-300 hover:text-white bg-slate-700 rounded-full border border-slate-600 transition">
+        <i data-lucide="sliders-horizontal" class="w-4 h-4 text-slate-300"></i>
+      </button>
+
       <button onclick="openModal('inspectorModal')" class="flex items-center bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded-full border border-slate-600 text-slate-300 text-xs font-bold transition">
         <i data-lucide="layers" class="w-3.5 h-3.5 mr-1 text-slate-400"></i>
         <span id="deckCounter">56 / 56</span>
@@ -74,7 +95,7 @@
         <i data-lucide="trophy" class="w-5 h-5 text-amber-400"></i>
       </button>
 
-      <button onclick="resetGamePrompt()" class="p-2 text-slate-300 hover:text-white transition" title="Neues Spiel">
+      <button onclick="resetGamePrompt()" class="p-2 text-slate-300 hover:text-white transition" title="Neues Spiel (aktueller Modus)">
         <i data-lucide="rotate-ccw" class="w-5 h-5 text-slate-400"></i>
       </button>
     </div>
@@ -174,6 +195,33 @@
 
   </section>
 
+  <!-- DICE SIMULATION SECTION (WÜRFEL-SIMULATION MODUS) -->
+  <section id="diceGameSection" class="hidden bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg">
+    <div class="bg-slate-900 rounded-2xl p-3 border border-slate-700 text-center mb-3 flex items-center justify-between px-4">
+      <div class="text-left">
+        <div class="text-[9px] text-slate-400 font-extrabold tracking-wider uppercase">Punkte dieser Runde</div>
+        <div id="diceTurnScoreValue" class="text-3xl font-black text-amber-400 leading-none mt-0.5">0</div>
+      </div>
+      <div id="diceRemainingBadge" class="text-[11px] font-bold text-slate-400 text-right leading-snug"></div>
+    </div>
+
+    <div class="mb-3">
+      <div class="text-[9px] text-slate-500 font-extrabold uppercase tracking-wider mb-1">Rausgelegte Würfel</div>
+      <div id="dicePlayedRow" class="flex flex-wrap gap-1.5 min-h-[34px] bg-slate-900/60 border border-slate-700 rounded-xl p-2"></div>
+    </div>
+
+    <div class="mb-3">
+      <div class="text-[9px] text-slate-500 font-extrabold uppercase tracking-wider mb-1">Dein Wurf – 1en/5en antippen, Pasch-Button nutzen</div>
+      <div id="diceRollRow" class="flex flex-wrap gap-2 items-center min-h-[50px]"></div>
+      <div id="diceGroupsRow" class="flex flex-wrap gap-2 mt-2"></div>
+      <div id="diceSelectionInfo" class="text-[11px] font-bold mt-2 leading-snug"></div>
+    </div>
+
+    <div id="diceControlsContainer">
+      <!-- Injected by JS -->
+    </div>
+  </section>
+
   <!-- PURE CARD DECK CONTROLS (STAPEL-NUR MODUS) -->
   <section id="pureDeckSection" class="hidden bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg">
     <button onclick="drawCard()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm py-4 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
@@ -182,18 +230,27 @@
     </button>
   </section>
 
-  <!-- MODAL 0: STARTUP MODE SELECTOR & PRE-GAME SETUP -->
-  <div id="modeSelectModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+  <!-- MODAL 0: STARTUP MODE SELECTOR -->
+  <div id="modeSelectModal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
     <div class="bg-slate-800 border border-slate-700 w-full max-w-sm rounded-3xl p-6 shadow-2xl">
       <h2 class="text-2xl font-black text-center text-white mb-1">TUTTO!</h2>
-      <p class="text-xs text-center text-slate-400 mb-5 font-semibold">Wähle deinen bevorzugten Spielmodus:</p>
+      <p class="text-xs text-center text-slate-400 mb-4 font-semibold">Wähle deinen bevorzugten Spielmodus:</p>
+      <p class="text-[10px] text-center text-slate-500 mb-4 font-semibold leading-snug">Jeder Modus hat einen eigenen Spielstand und<br>eigene Einstellungen (⚙️ in der Kopfzeile).</p>
 
       <div class="space-y-3 mb-6">
         <button onclick="selectGameMode('full')" class="w-full bg-slate-700 hover:bg-slate-600 border-2 border-sky-500/80 p-4 rounded-2xl text-left transition flex items-start space-x-3">
           <i data-lucide="trophy" class="w-7 h-7 text-amber-400 mt-0.5"></i>
           <div>
             <div class="text-sm font-black text-white">🏆 Gesamtes Spiel</div>
-            <div class="text-[11px] text-slate-300 mt-0.5">Mit Punkte-Assistent, automatischer Bonusberechnung & Mitspieler-Verwaltung.</div>
+            <div class="text-[11px] text-slate-300 mt-0.5">Mit Punkte-Assistent (manuelle Würfelpunkte), Bonusberechnung & Mitspieler-Verwaltung.</div>
+          </div>
+        </button>
+
+        <button onclick="selectGameMode('dice')" class="w-full bg-slate-700 hover:bg-slate-600 border-2 border-emerald-500/80 p-4 rounded-2xl text-left transition flex items-start space-x-3">
+          <i data-lucide="dices" class="w-7 h-7 text-emerald-400 mt-0.5"></i>
+          <div>
+            <div class="text-sm font-black text-white">🎲 Würfel-Simulation</div>
+            <div class="text-[11px] text-slate-300 mt-0.5">Wie Gesamtes Spiel, aber die App würfelt für dich. Jede 1 & 5 einzeln auswählbar (mind. eine), Dreier-Pässe nur ganz oder gar nicht.</div>
           </div>
         </button>
 
@@ -223,6 +280,8 @@
         </button>
       </div>
 
+      <div class="text-[10px] text-slate-500 font-bold mb-2 uppercase tracking-wider">Spielstand nur für: <span id="scoreboardModeLabel" class="text-sky-400"></span></div>
+
       <div id="playerListContainer" class="space-y-2 mb-4 max-h-56 overflow-y-auto">
         <!-- Rendered by JS -->
       </div>
@@ -235,7 +294,7 @@
 
         <button onclick="resetScoresConfirm()" class="w-full text-red-400 hover:text-red-300 text-xs font-bold py-1.5 flex items-center justify-center space-x-1">
           <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-          <span>Punkte & Spiel zurücksetzen</span>
+          <span>Punkte & Spiel dieses Modus zurücksetzen</span>
         </button>
       </div>
 
@@ -264,14 +323,35 @@
     </div>
   </div>
 
-  <!-- MODAL 3: WINNER POPUP -->
+  <!-- MODAL 3: MODE SETTINGS -->
+  <div id="settingsModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
+    <div class="bg-slate-800 w-full max-w-md rounded-3xl border border-slate-700 p-5 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-3">
+        <h3 class="text-base font-black text-slate-100 flex items-center">
+          <i data-lucide="sliders-horizontal" class="w-5 h-5 text-sky-400 mr-2"></i>
+          Modus-Einstellungen
+        </h3>
+        <button onclick="closeModal('settingsModal')" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <div id="settingsBody" class="max-h-[58vh] overflow-y-auto space-y-3 pr-1">
+        <!-- Rendered by JS -->
+      </div>
+
+      <button onclick="closeModal('settingsModal')" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs py-3 rounded-xl mt-4 transition">Fertig & Schließen</button>
+    </div>
+  </div>
+
+  <!-- MODAL 4: WINNER POPUP -->
   <div id="winnerModal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
     <div class="bg-emerald-900 border-2 border-emerald-500 w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl">
       <i data-lucide="trophy" class="w-16 h-16 text-amber-400 mx-auto mb-2"></i>
       <h2 class="text-3xl font-black text-amber-300">GEWONNEN! 🎉</h2>
       <p id="winnerName" class="text-2xl font-black text-white mt-1">Spieler 1</p>
       <p id="winnerReason" class="text-xs font-bold text-emerald-200 mt-2">6000 Punkte erreicht!</p>
-      <button onclick="resetGameFull()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm py-3.5 rounded-2xl mt-6 shadow transition">Neues Spiel starten</button>
+      <button onclick="resetActiveMode()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm py-3.5 rounded-2xl mt-6 shadow transition">Neues Spiel starten</button>
     </div>
   </div>
 
@@ -311,121 +391,193 @@
       return a;
     }
 
-    // --- GAME STATE ---
-    let gameMode = 'full'; // 'full' or 'pure'
-    let drawPile = createFreshDeck();
-    let discardPile = [];
-    let currentCard = null;
-    
-    let players = [
-      { id: '1', name: 'Spieler 1', score: 0 },
-      { id: '2', name: 'Spieler 2', score: 0 }
-    ];
-    let activePlayerIdx = 0;
-    let turnScore = 0;
-    let targetScore = 6000;
-    let kleeblattCount = 0;
-    let isTuttoAchieved = false;
+    const MODE_IDS = ['full', 'pure', 'dice'];
+    function modeLabel(mode) {
+      return mode === 'pure' ? '🃏 Nur Kartenstapel' : (mode === 'dice' ? '🎲 Würfel-Simulation' : '🏆 Gesamtes Spiel');
+    }
 
-    // --- LOCAL STORAGE SESSION PERSISTENCE ---
-    const STORAGE_KEY = 'tutto_app_session_v1';
+    // --- DICE SIMULATION CONFIG (nur Würfel-Modus) ---
+    function defaultDiceConfig() {
+      return {
+        diceCount: 6,
+        singleOne: 100,
+        singleFive: 50,
+        setPoints: { 1: 1000, 2: 200, 3: 300, 4: 400, 5: 500, 6: 600 },
+        onesFivesFree: true,
+        streetAutoTutto: true
+      };
+    }
+
+    function defaultPlayers() {
+      return [
+        { id: '1', name: 'Spieler 1', score: 0 },
+        { id: '2', name: 'Spieler 2', score: 0 }
+      ];
+    }
+
+    function createModeState(mode) {
+      return {
+        drawPile: createFreshDeck(),
+        discardPile: [],
+        currentCard: null,
+        isTuttoAchieved: false,
+        kleeblattCount: 0,
+        turnScore: 0,
+        players: defaultPlayers(),
+        activePlayerIdx: 0,
+        targetScore: 6000,
+        config: mode === 'dice' ? defaultDiceConfig() : {},
+        dice: { currentRoll: [], selected: [], played: [] }
+      };
+    }
+
+    // --- GAME STATE (PRO MODUS GETRENNT) ---
+    let gameMode = 'full';
+    let states = {
+      full: createModeState('full'),
+      pure: createModeState('pure'),
+      dice: createModeState('dice')
+    };
+    let S = states[gameMode];
+
+    // --- LOCAL STORAGE: V2 = getrennt pro Modus, V1 = altes Format ---
+    const STORAGE_KEY_V2 = 'tutto_modes_v2';
+    const STORAGE_KEY_V1 = 'tutto_app_session_v1';
 
     function saveSession() {
       try {
-        const state = {
-          gameMode,
-          drawPile,
-          discardPile,
-          currentCard,
-          players,
-          activePlayerIdx,
-          turnScore,
-          targetScore,
-          kleeblattCount,
-          isTuttoAchieved,
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(STORAGE_KEY_V2, JSON.stringify({ lastMode: gameMode, states }));
       } catch (e) {
         console.warn('Session autosave error', e);
       }
     }
 
+    function mergeDiceConfig(cfg, raw) {
+      const d = defaultDiceConfig();
+      if (!raw || typeof raw !== 'object') return cfg;
+      const n = Number(raw.diceCount);
+      if (n >= 1 && n <= 12) cfg.diceCount = n;
+      ['singleOne', 'singleFive'].forEach(k => {
+        const v = Number(raw[k]);
+        if (!isNaN(v) && v >= 0) cfg[k] = v; else cfg[k] = d[k];
+      });
+      for (let f = 1; f <= 6; f++) {
+        const v = raw.setPoints ? Number(raw.setPoints[f]) : NaN;
+        cfg.setPoints[f] = (!isNaN(v) && v >= 0) ? v : d.setPoints[f];
+      }
+      cfg.onesFivesFree = typeof raw.onesFivesFree === 'boolean' ? raw.onesFivesFree : d.onesFivesFree;
+      cfg.streetAutoTutto = typeof raw.streetAutoTutto === 'boolean' ? raw.streetAutoTutto : d.streetAutoTutto;
+      return cfg;
+    }
+
+    function normalizeState(mode, raw) {
+      const s = createModeState(mode);
+      if (!raw || typeof raw !== 'object') return s;
+      if (Array.isArray(raw.drawPile) && raw.drawPile.every(c => c && c.type)) s.drawPile = raw.drawPile;
+      if (Array.isArray(raw.discardPile) && raw.discardPile.every(c => c && c.type)) s.discardPile = raw.discardPile;
+      if (raw.currentCard && raw.currentCard.type) s.currentCard = raw.currentCard;
+      s.isTuttoAchieved = !!raw.isTuttoAchieved;
+      s.kleeblattCount = Number(raw.kleeblattCount) || 0;
+      s.turnScore = Number(raw.turnScore) || 0;
+      if (Array.isArray(raw.players) && raw.players.length) {
+        s.players = raw.players.map(p => ({ id: String(p.id), name: String(p.name || 'Spieler'), score: Number(p.score) || 0 }));
+      }
+      const idx = Number(raw.activePlayerIdx);
+      s.activePlayerIdx = (!isNaN(idx) && idx >= 0 && idx < s.players.length) ? idx : 0;
+      const t = Number(raw.targetScore);
+      if (t > 0) s.targetScore = t;
+      if (mode === 'dice') {
+        mergeDiceConfig(s.config, raw.config);
+        if (raw.dice) {
+          s.dice = {
+            currentRoll: Array.isArray(raw.dice.currentRoll) ? raw.dice.currentRoll : [],
+            selected: Array.isArray(raw.dice.selected) ? raw.dice.selected : [],
+            played: Array.isArray(raw.dice.played) ? raw.dice.played : []
+          };
+        }
+      }
+      return s;
+    }
+
     function loadSession() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return false;
-        const state = JSON.parse(raw);
-        if (!state || !state.players) return false;
-
-        gameMode = state.gameMode || 'full';
-        drawPile = state.drawPile || createFreshDeck();
-        discardPile = state.discardPile || [];
-        currentCard = state.currentCard || null;
-        players = state.players || players;
-        activePlayerIdx = state.activePlayerIdx || 0;
-        turnScore = state.turnScore || 0;
-        targetScore = state.targetScore || 6000;
-        kleeblattCount = state.kleeblattCount || 0;
-        isTuttoAchieved = state.isTuttoAchieved || false;
-
-        return true;
+        const raw = localStorage.getItem(STORAGE_KEY_V2);
+        if (raw) {
+          const o = JSON.parse(raw);
+          MODE_IDS.forEach(m => { states[m] = normalizeState(m, o.states && o.states[m]); });
+          gameMode = MODE_IDS.indexOf(o.lastMode) !== -1 ? o.lastMode : 'full';
+          S = states[gameMode];
+          return true;
+        }
+        // Migration aus altem Single-State-Speicher
+        const v1 = localStorage.getItem(STORAGE_KEY_V1);
+        if (v1) {
+          const o = JSON.parse(v1);
+          states.full = normalizeState('full', o);
+          states.pure = normalizeState('pure', o);
+          states.dice = normalizeState('dice', { players: o.players, targetScore: o.targetScore });
+          gameMode = o.gameMode === 'pure' ? 'pure' : 'full';
+          S = states[gameMode];
+          saveSession();
+          return true;
+        }
+        return false;
       } catch (e) {
         console.warn('Session load error', e);
         return false;
       }
     }
 
-    function clearSession() {
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch (e) {}
+    function resetDiceState() {
+      S.dice = { currentRoll: [], selected: [], played: [] };
     }
 
     function selectGameMode(mode) {
       gameMode = mode;
-      document.getElementById('closeModeBtn').classList.remove('hidden');
-      closeModal('modeSelectModal');
-      
-      if (mode === 'pure') {
-        document.getElementById('playerHeaderPill').classList.add('hidden');
-        document.getElementById('headerTrophyBtn').classList.add('hidden');
-        document.getElementById('deckModeBadge').classList.remove('hidden');
-        document.getElementById('fullGameSection').classList.add('hidden');
-        document.getElementById('pureDeckSection').classList.remove('hidden');
+      S = states[mode];
+      const pure = mode === 'pure';
+      const full = mode === 'full';
+
+      document.getElementById('playerHeaderPill').classList.toggle('hidden', pure);
+      document.getElementById('headerTrophyBtn').classList.toggle('hidden', pure);
+      document.getElementById('deckModeBadge').classList.toggle('hidden', !pure);
+      document.getElementById('fullGameSection').classList.toggle('hidden', !full);
+      document.getElementById('diceGameSection').classList.toggle('hidden', mode !== 'dice');
+      document.getElementById('pureDeckSection').classList.toggle('hidden', !pure);
+
+      if (pure) {
         document.getElementById('cardBackSubtitle').innerText = 'Tippe hier, um eine Karte zu ziehen';
-      } else {
-        document.getElementById('playerHeaderPill').classList.remove('hidden');
-        document.getElementById('headerTrophyBtn').classList.remove('hidden');
-        document.getElementById('deckModeBadge').classList.add('hidden');
-        document.getElementById('fullGameSection').classList.remove('hidden');
-        document.getElementById('pureDeckSection').classList.add('hidden');
       }
+      document.getElementById('closeModeBtn').classList.remove('hidden');
+
       updateUI();
       saveSession();
     }
 
     function updateUI() {
-      const p = players[activePlayerIdx] || players[0];
+      const p = S.players[S.activePlayerIdx] || S.players[0];
       document.getElementById('activePlayerName').innerText = p.name;
       document.getElementById('activePlayerScore').innerText = `${p.score} Pkt`;
-      document.getElementById('deckCounter').innerText = `${drawPile.length} / 56`;
-      document.getElementById('turnScoreValue').innerText = turnScore;
+      document.getElementById('deckCounter').innerText = `${S.drawPile.length} / 56`;
+      document.getElementById('turnScoreValue').innerText = S.turnScore;
+      const dtv = document.getElementById('diceTurnScoreValue');
+      if (dtv) dtv.innerText = S.turnScore;
 
       // Update Card Visual state if restored
-      if (currentCard) {
+      if (S.currentCard) {
         const cardFront = document.getElementById('cardFront');
-        cardFront.className = `absolute inset-0 backface-hidden rotate-y-180 rounded-3xl border-4 flex flex-col justify-between overflow-hidden shadow-2xl ${currentCard.bg} ${currentCard.border}`;
+        cardFront.className = `absolute inset-0 backface-hidden rotate-y-180 rounded-3xl border-4 flex flex-col justify-between overflow-hidden shadow-2xl ${S.currentCard.bg} ${S.currentCard.border}`;
         
-        document.getElementById('cardBanner').className = `${currentCard.bannerBg} text-white py-3 text-center`;
-        document.getElementById('cardBadge').className = `${currentCard.bannerBg} text-white font-black text-2xl px-5 py-1.5 rounded-full mb-3 shadow`;
-        document.getElementById('cardBadge').innerText = currentCard.badge;
+        document.getElementById('cardBanner').className = `${S.currentCard.bannerBg} text-white py-3 text-center`;
+        document.getElementById('cardBadge').className = `${S.currentCard.bannerBg} text-white font-black text-2xl px-5 py-1.5 rounded-full mb-3 shadow`;
+        document.getElementById('cardBadge').innerText = S.currentCard.badge;
 
-        document.getElementById('cardTitle').innerText = currentCard.title;
-        document.getElementById('cardDescription').innerText = currentCard.desc;
-        document.getElementById('cardFooterText').innerText = `Karte ${discardPile.length + 1} von 56`;
+        document.getElementById('cardTitle').innerText = S.currentCard.title;
+        document.getElementById('cardDescription').innerText = S.currentCard.desc;
+        document.getElementById('cardFooterText').innerText = `Karte ${S.discardPile.length + 1} von 56`;
 
         const iconEl = document.getElementById('cardIcon');
-        iconEl.setAttribute('data-lucide', currentCard.icon);
+        iconEl.setAttribute('data-lucide', S.currentCard.icon);
         
         document.getElementById('cardInner').style.transform = 'rotateY(180deg)';
       } else {
@@ -433,6 +585,7 @@
       }
 
       renderControls();
+      if (gameMode === 'dice') renderDiceArea();
       renderScoreboard();
       renderInspector();
       lucide.createIcons();
@@ -440,9 +593,20 @@
 
     function renderControls() {
       const container = document.getElementById('controlsContainer');
-      const pName = (players[activePlayerIdx] || players[0]).name;
+      const dc = document.getElementById('diceControlsContainer');
 
-      if (!currentCard) {
+      if (gameMode === 'dice') {
+        renderDiceControls(dc);
+        return;
+      }
+      if (gameMode === 'pure') {
+        container.innerHTML = '';
+        return;
+      }
+
+      const pName = (S.players[S.activePlayerIdx] || S.players[0]).name;
+
+      if (!S.currentCard) {
         document.getElementById('btnTutto').classList.add('hidden');
         document.getElementById('diceQuickSection').classList.add('hidden');
         container.innerHTML = `
@@ -451,7 +615,7 @@
             <span>KARTE FÜR ${pName.toUpperCase()} ZIEHEN</span>
           </button>
         `;
-      } else if (currentCard.type === 'stopp') {
+      } else if (S.currentCard.type === 'stopp') {
         document.getElementById('btnTutto').classList.add('hidden');
         document.getElementById('diceQuickSection').classList.add('hidden');
         container.innerHTML = `
@@ -460,7 +624,7 @@
             <span>STOPP – ZUG BEENDEN & WEITER</span>
           </button>
         `;
-      } else if (isTuttoAchieved) {
+      } else if (S.isTuttoAchieved) {
         document.getElementById('btnTutto').classList.add('hidden');
         document.getElementById('diceQuickSection').classList.add('hidden');
         container.innerHTML = `
@@ -501,20 +665,22 @@
     }
 
     function drawCard() {
-      if (drawPile.length === 0) {
-        if (discardPile.length === 0) drawPile = createFreshDeck();
-        else { drawPile = shuffle(discardPile); discardPile = []; }
+      if (S.drawPile.length === 0) {
+        if (S.discardPile.length === 0) S.drawPile = createFreshDeck();
+        else { S.drawPile = shuffle(S.discardPile); S.discardPile = []; }
         showToast('🔄 Stapel leer – Karten neu gemischt!');
       }
 
-      if (currentCard) discardPile.push(currentCard);
-      currentCard = drawPile.pop();
-      isTuttoAchieved = false;
+      if (S.currentCard) S.discardPile.push(S.currentCard);
+      S.currentCard = S.drawPile.pop();
+      S.isTuttoAchieved = false;
 
-      if (currentCard.type === 'stopp' && gameMode === 'full') {
+      if (S.currentCard.type === 'stopp' && (gameMode === 'full' || gameMode === 'dice')) {
         showToast('🔴 STOPP-Karte gezogen! Zug endet mit 0 Punkten.');
-        turnScore = 0;
+        S.turnScore = 0;
       }
+
+      if (gameMode === 'dice') resetDiceState();
 
       updateUI();
       saveSession();
@@ -527,43 +693,58 @@
       }, 250);
     }
 
+    // ===== NUR GESAMTES SPIEL: MANUELLE PUNKTE =====
     function addDicePoints(pts) {
-      if (!currentCard || currentCard.type === 'stopp') return;
-      turnScore += pts;
+      if (!S.currentCard || S.currentCard.type === 'stopp') return;
+      S.turnScore += pts;
       updateUI();
       saveSession();
     }
 
-    function triggerTutto() {
-      if (!currentCard || isTuttoAchieved) return;
+    // ===== NUR GESAMTES SPIEL: MANUELLE NIETE =====
+    function triggerNiete() {
+      if (S.currentCard && S.currentCard.type === 'feuerwerk') {
+        bankPointsAndEnd(`Feuerwerk beendet! ${S.turnScore} Punkte gesichert.`);
+      } else {
+        const pName = S.players[S.activePlayerIdx].name;
+        S.turnScore = 0;
+        S.kleeblattCount = 0;
+        showToast(`💥 VERZOCKT! ${pName} verliert alle gesammelten Punkte dieser Runde.`);
+        nextPlayer();
+      }
+    }
 
-      isTuttoAchieved = true;
+    // ===== TUTTO-ERFOLG (Karten-Boni, beide Punkte-Modi) =====
+    function triggerTutto() {
+      if (!S.currentCard || S.isTuttoAchieved) return;
+
+      S.isTuttoAchieved = true;
       let msg = '';
 
-      if (currentCard.bonusVal) {
-        turnScore += currentCard.bonusVal;
-        msg = `+${currentCard.bonusVal} Bonus hinzugefügt!`;
-      } else if (currentCard.type === 'double') {
-        turnScore = turnScore * 2;
+      if (S.currentCard.bonusVal) {
+        S.turnScore += S.currentCard.bonusVal;
+        msg = `+${S.currentCard.bonusVal} Bonus hinzugefügt!`;
+      } else if (S.currentCard.type === 'double') {
+        S.turnScore = S.turnScore * 2;
         msg = `Punkte verdoppelt (×2)!`;
-      } else if (currentCard.type === 'plus_minus') {
-        turnScore += 1000;
+      } else if (S.currentCard.type === 'plus_minus') {
+        S.turnScore += 1000;
         let max = -1, leaderIdx = -1;
-        players.forEach((p, idx) => {
-          if (idx !== activePlayerIdx && p.score > max && p.score > 0) {
+        S.players.forEach((p, idx) => {
+          if (idx !== S.activePlayerIdx && p.score > max && p.score > 0) {
             max = p.score; leaderIdx = idx;
           }
         });
         if (leaderIdx !== -1) {
-          players[leaderIdx].score = Math.max(0, players[leaderIdx].score - 1000);
-          msg = `+1000 Pkt! Führender (${players[leaderIdx].name}) verliert 1.000 Pkt.`;
+          S.players[leaderIdx].score = Math.max(0, S.players[leaderIdx].score - 1000);
+          msg = `+1000 Pkt! Führender (${S.players[leaderIdx].name}) verliert 1.000 Pkt.`;
         } else {
           msg = `+1000 Pkt!`;
         }
-      } else if (currentCard.type === 'kleeblatt') {
-        kleeblattCount++;
-        if (kleeblattCount >= 2) {
-          showWinner(players[activePlayerIdx].name, '🍀 SOFORT-SIEG durch 2x Tutto bei Kleeblatt!');
+      } else if (S.currentCard.type === 'kleeblatt') {
+        S.kleeblattCount++;
+        if (S.kleeblattCount >= 2) {
+          showWinner(S.players[S.activePlayerIdx].name, '🍀 SOFORT-SIEG durch 2x Tutto bei Kleeblatt!');
           saveSession();
           return;
         } else {
@@ -571,30 +752,18 @@
         }
       }
 
-      showToast(`🎉 TUTTO! ${msg} Ziehe eine neue Karte zum Weiterzocken oder sichere deine Punkte.`);
+      showToast(`🎉 TUTTO! ${msg}`);
       updateUI();
       saveSession();
     }
 
-    function triggerNiete() {
-      if (currentCard && currentCard.type === 'feuerwerk') {
-        bankPointsAndEnd(`Feuerwerk beendet! ${turnScore} Punkte gesichert.`);
-      } else {
-        const pName = players[activePlayerIdx].name;
-        turnScore = 0;
-        kleeblattCount = 0;
-        showToast(`💥 VERZOCKT! ${pName} verliert alle gesammelten Punkte dieser Runde.`);
-        nextPlayer();
-      }
-    }
-
     function bankPointsAndEnd(customMsg) {
-      players[activePlayerIdx].score += turnScore;
-      const banked = turnScore;
-      const pName = players[activePlayerIdx].name;
+      S.players[S.activePlayerIdx].score += S.turnScore;
+      const banked = S.turnScore;
+      const pName = S.players[S.activePlayerIdx].name;
       
-      if (players[activePlayerIdx].score >= targetScore) {
-        showWinner(pName, `Zielpunktzahl von ${targetScore} Punkten erreicht!`);
+      if (S.players[S.activePlayerIdx].score >= S.targetScore) {
+        showWinner(pName, `Zielpunktzahl von ${S.targetScore} Punkten erreicht!`);
         saveSession();
         return;
       }
@@ -608,11 +777,12 @@
     }
 
     function nextPlayer() {
-      turnScore = 0;
-      kleeblattCount = 0;
-      currentCard = null;
-      isTuttoAchieved = false;
-      activePlayerIdx = (activePlayerIdx + 1) % players.length;
+      S.turnScore = 0;
+      S.kleeblattCount = 0;
+      S.currentCard = null;
+      S.isTuttoAchieved = false;
+      S.activePlayerIdx = (S.activePlayerIdx + 1) % S.players.length;
+      if (gameMode === 'dice') resetDiceState();
 
       document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
       updateUI();
@@ -625,17 +795,396 @@
       document.getElementById('winnerModal').classList.remove('hidden');
     }
 
+    // ==========================================
+    // WÜRFEL-SIMULATION (Modus 'dice')
+    // Regeln: jede 1 und 5 einzeln auswählbar
+    // (mind. ein Wertwürfel pro Wurf); Dreier-Pass
+    // nur ganz oder gar nicht – Weglassen nur, wenn
+    // eine andere 1/5 verfügbar ist.
+    // ==========================================
+    const PIP_MAP = {
+      1: [4], 2: [0, 8], 3: [0, 4, 8],
+      4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8]
+    };
+
+    function dieFace(v, sizeCls) {
+      let cells = '';
+      for (let i = 0; i < 9; i++) {
+        cells += '<span class="pip' + (PIP_MAP[v].indexOf(i) === -1 ? ' empty' : '') + '"></span>';
+      }
+      return '<div class="die-face ' + (sizeCls || '') + '">' + cells + '</div>';
+    }
+
+    function getGroups() {
+      const loose = S.config.onesFivesFree;
+      const sel = S.dice.selected;
+      const counts = {};
+      S.dice.currentRoll.forEach(d => { counts[d.v] = (counts[d.v] || 0) + 1; });
+      const groups = [];
+      Object.keys(counts).forEach(vs => {
+        const v = Number(vs);
+        if (counts[v] < 3) return;
+        const members = S.dice.currentRoll.filter(d => d.v === v).map(d => d.i);
+        const strict = !(loose && (v === 1 || v === 5));
+        if (!strict) {
+          const selM = members.filter(i => sel.indexOf(i) !== -1);
+          // Einzeln angebrochener 1er/5er-Pasch zählt nicht mehr als Pasch-Option
+          if (selM.length > 0 && selM.length < members.length) return;
+        }
+        groups.push({ v, members, count: members.length, strict });
+      });
+      return groups;
+    }
+
+    function hasFreeOneFive(groups) {
+      const loose = S.config.onesFivesFree;
+      groups = groups || getGroups();
+      return S.dice.currentRoll.some(d =>
+        (d.v === 1 || d.v === 5) &&
+        (loose || !groups.some(g => g.strict && g.members.indexOf(d.i) !== -1))
+      );
+    }
+
+    function hasScoringOption() {
+      if (S.dice.currentRoll.some(d => d.v === 1 || d.v === 5)) return true;
+      return getGroups().length > 0;
+    }
+
+    function groupPoints(g) {
+      const per = Number(S.config.setPoints[g.v]) || g.v * 100;
+      return per * (g.count - 2);
+    }
+
+    function selectedPoints(groups) {
+      groups = groups || getGroups();
+      let pts = 0;
+      const inFullGroup = [];
+      groups.forEach(g => {
+        if (g.members.every(i => S.dice.selected.indexOf(i) !== -1)) {
+          pts += groupPoints(g);
+          g.members.forEach(i => inFullGroup.push(i));
+        }
+      });
+      S.dice.selected.forEach(i => {
+        if (inFullGroup.indexOf(i) !== -1) return;
+        const d = S.dice.currentRoll.find(x => x.i === i);
+        if (!d) return;
+        if (d.v === 1) pts += Number(S.config.singleOne) || 0;
+        else if (d.v === 5) pts += Number(S.config.singleFive) || 0;
+      });
+      return pts;
+    }
+
+    function validateSelection(groups, free) {
+      groups = groups || getGroups();
+      if (!S.dice.selected.length) {
+        return { ok: false, msg: 'Mindestens eine 1, eine 5 oder einen Pasch auswählen!' };
+      }
+      const hasFree = (free === undefined) ? hasFreeOneFive(groups) : free;
+      for (const g of groups) {
+        if (!g.strict) continue;
+        const allSel = g.members.every(i => S.dice.selected.indexOf(i) !== -1);
+        if (!allSel && !hasFree) {
+          return { ok: false, msg: `${g.count}×${g.v}-Pasch ist Pflicht – keine andere 1/5 verfügbar!` };
+        }
+      }
+      return { ok: true, msg: '' };
+    }
+
+    function refreshDice() {
+      renderDiceArea();
+      renderDiceControls(document.getElementById('diceControlsContainer'));
+      lucide.createIcons();
+      saveSession();
+    }
+
+    function rollDice() {
+      if (gameMode !== 'dice') return;
+      if (!S.currentCard || S.currentCard.type === 'stopp') {
+        showToast('⚠️ Bitte zuerst eine Karte ziehen!');
+        return;
+      }
+      if (S.dice.currentRoll.length) return;
+
+      const cfg = S.config;
+      let remaining = cfg.diceCount - S.dice.played.length;
+      if (remaining <= 0) { S.dice.played = []; remaining = cfg.diceCount; }
+
+      const vals = [];
+      for (let i = 0; i < remaining; i++) vals.push(1 + Math.floor(Math.random() * 6));
+      S.dice.currentRoll = vals.map((v, i) => ({ i, v }));
+      S.dice.selected = [];
+
+      // Straße: 1-2-3-4-5-6 auf frischem vollem Wurf => auto Tutto
+      if (cfg.streetAutoTutto && S.currentCard.type === 'strasse' && remaining === cfg.diceCount && vals.slice().sort().join('') === '123456') {
+        S.dice.played = vals.slice();
+        S.dice.currentRoll = [];
+        showToast('🚂 STRAẞE! 1-2-3-4-5-6 gewürfelt!');
+        triggerTutto();
+        return;
+      }
+
+      if (!hasScoringOption()) {
+        showToast('💥 Wurf ohne 1/5 und ohne Pasch…');
+        updateUI();
+        saveSession();
+        setTimeout(() => { applyNieteFromRoll(); }, 1200);
+        return;
+      }
+
+      updateUI();
+      saveSession();
+    }
+
+    function toggleDie(i) {
+      const d = S.dice.currentRoll.find(x => x.i === i);
+      if (!d) return;
+      const groups = getGroups();
+      const g = groups.find(x => x.members.indexOf(i) !== -1);
+      const isOneFive = d.v === 1 || d.v === 5;
+
+      if (!isOneFive) {
+        if (g) showToast(`ℹ️ ${g.count}×${g.v} nur komplett als Pasch wählbar!`);
+        else showToast('ℹ️ Nur 1en, 5en und Pasch-Würfel sind Wertwürfel.');
+        return;
+      }
+      if (g && !S.config.onesFivesFree) {
+        showToast(`ℹ️ ${g.count}×${g.v} nur komplett als Pasch wählbar!`);
+        return;
+      }
+
+      if (g) {
+        // Einzelne 1/5 antippen bricht den Pasch auf (nur wenn 1/5 frei wählbar)
+        const others = g.members.filter(m => m !== i);
+        S.dice.selected = S.dice.selected.filter(s => others.indexOf(s) === -1);
+      }
+      const idx = S.dice.selected.indexOf(i);
+      if (idx === -1) S.dice.selected.push(i);
+      else S.dice.selected.splice(idx, 1);
+
+      refreshDice();
+    }
+
+    function toggleGroup(v) {
+      const g = getGroups().find(x => x.v === v);
+      if (!g) return;
+      const allSel = g.members.every(i => S.dice.selected.indexOf(i) !== -1);
+      S.dice.selected = S.dice.selected.filter(i => g.members.indexOf(i) === -1);
+      if (!allSel) S.dice.selected = S.dice.selected.concat(g.members);
+      refreshDice();
+    }
+
+    function confirmSelection() {
+      const groups = getGroups();
+      const v = validateSelection(groups);
+      if (!v.ok) { showToast('⚠️ ' + v.msg); return; }
+
+      const pts = selectedPoints(groups);
+      const chosen = S.dice.currentRoll.filter(d => S.dice.selected.indexOf(d.i) !== -1);
+      S.dice.played = S.dice.played.concat(chosen.map(d => d.v));
+      S.dice.currentRoll = [];
+      S.dice.selected = [];
+      S.turnScore += pts;
+
+      const cfg = S.config;
+      if (S.dice.played.length >= cfg.diceCount) {
+        triggerTutto();
+      } else {
+        showToast(`✅ +${pts} Pkt rausgelegt. Noch ${cfg.diceCount - S.dice.played.length} Würfel übrig.`);
+        updateUI();
+        saveSession();
+      }
+    }
+
+    function applyNieteFromRoll() {
+      if (!S.dice.currentRoll.length) return;
+      S.dice.currentRoll = [];
+      S.dice.selected = [];
+      if (S.currentCard && S.currentCard.type === 'feuerwerk') {
+        bankPointsAndEnd(`🎆 Feuerwerk-Niete! ${S.turnScore} Punkte bleiben gesichert.`);
+      } else {
+        S.turnScore = 0;
+        S.kleeblattCount = 0;
+        resetDiceState();
+        showToast('💥 NIETE! Keine 1/5 und kein Pasch – Rundenpunkte verloren.');
+        nextPlayer();
+      }
+    }
+
+    function feuerwerkContinueRoll() {
+      if (!S.currentCard || S.currentCard.type !== 'feuerwerk') return;
+      S.dice.played = [];
+      S.dice.currentRoll = [];
+      S.dice.selected = [];
+      S.isTuttoAchieved = false;
+      rollDice();
+    }
+
+    function renderDiceControls(dc) {
+      const p = S.players[S.activePlayerIdx] || S.players[0];
+      const cfg = S.config;
+      const btnBase = 'w-full font-black text-sm py-3.5 rounded-2xl shadow transition flex items-center justify-center space-x-2';
+
+      if (!S.currentCard) {
+        dc.innerHTML = `
+          <button onclick="drawCard()" class="${btnBase} bg-blue-600 hover:bg-blue-500 text-white">
+            <i data-lucide="arrow-right-circle" class="w-5 h-5"></i>
+            <span>KARTE FÜR ${p.name.toUpperCase()} ZIEHEN</span>
+          </button>`;
+        return;
+      }
+      if (S.currentCard.type === 'stopp') {
+        dc.innerHTML = `
+          <button onclick="endTurnStopp()" class="${btnBase} bg-red-600 hover:bg-red-500 text-white">
+            <i data-lucide="octagon" class="w-5 h-5"></i>
+            <span>STOPP – ZUG BEENDEN & WEITER</span>
+          </button>`;
+        return;
+      }
+      if (S.isTuttoAchieved) {
+        if (S.currentCard.type === 'feuerwerk') {
+          dc.innerHTML = `
+            <button onclick="feuerwerkContinueRoll()" class="${btnBase} bg-orange-500 hover:bg-orange-400 text-white">
+              <i data-lucide="flame" class="w-5 h-5"></i>
+              <span>🎆 FEUERWERK: WEITERWÜRFELN (6 FRISCHE WÜRFEL)</span>
+            </button>`;
+        } else {
+          dc.innerHTML = `
+            <div class="space-y-2">
+              <button onclick="drawCardInSameTurn()" class="${btnBase} bg-blue-600 hover:bg-blue-500 text-white">
+                <i data-lucide="sparkles" class="w-5 h-5"></i>
+                <span>NÄCHSTE KARTE ZIEHEN (WEITERZOCKEN!)</span>
+              </button>
+              <button onclick="bankPointsAndEnd()" class="${btnBase} bg-emerald-600 hover:bg-emerald-500 text-white">
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
+                <span>PUNKTE SICHERN & ZUG BEENDEN</span>
+              </button>
+            </div>`;
+        }
+        return;
+      }
+      if (S.dice.currentRoll.length) {
+        if (!hasScoringOption()) {
+          dc.innerHTML = `
+            <button onclick="applyNieteFromRoll()" class="${btnBase} bg-red-700 hover:bg-red-600 text-white">
+              <i data-lucide="x-circle" class="w-5 h-5"></i>
+              <span>💥 NIETE! (KEINE 1/5, KEIN PASCH)</span>
+            </button>`;
+        } else {
+          const groups = getGroups();
+          const val = validateSelection(groups);
+          const pts = selectedPoints(groups);
+          dc.innerHTML = `
+            <button onclick="confirmSelection()" class="${btnBase} ${val.ok ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-slate-600'} text-white">
+              <i data-lucide="check-circle" class="w-5 h-5"></i>
+              <span>AUSWAHL ÜBERNEHMEN (+${pts} PKT)</span>
+            </button>
+            ${val.ok ? '' : `<p class="text-[11px] font-bold text-red-300 mt-2 text-center">${val.msg}</p>`}`;
+        }
+        return;
+      }
+
+      // Idle-Phase: würfeln oder sichern
+      const remaining = cfg.diceCount - S.dice.played.length;
+      let html = `
+        <button onclick="rollDice()" class="${btnBase} bg-sky-600 hover:bg-sky-500 text-white">
+          <i data-lucide="dice-5" class="w-5 h-5"></i>
+          <span>WÜRFELN (${remaining} WÜRFEL)</span>
+        </button>`;
+      if (S.currentCard.type === 'feuerwerk') {
+        html += `<p class="text-[11px] font-bold text-orange-300 mt-2 text-center">🎆 Feuerwerk aktiv: Du MUSST bis zur Niete weiterwürfeln!</p>`;
+      } else {
+        html += `
+          <button onclick="bankPointsAndEnd()" class="w-full mt-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-emerald-300 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center space-x-2">
+            <i data-lucide="check-circle" class="w-4 h-4"></i>
+            <span>PUNKTE SICHERN & ZUG BEENDEN</span>
+          </button>`;
+      }
+      dc.innerHTML = html;
+    }
+
+    function renderDiceArea() {
+      if (gameMode !== 'dice') return;
+      const cfg = S.config;
+      const playedRow = document.getElementById('dicePlayedRow');
+      const rollRow = document.getElementById('diceRollRow');
+      const groupsRow = document.getElementById('diceGroupsRow');
+      const info = document.getElementById('diceSelectionInfo');
+      const remainBadge = document.getElementById('diceRemainingBadge');
+
+      const remaining = cfg.diceCount - S.dice.played.length;
+      remainBadge.innerHTML = `${S.dice.played.length}/${cfg.diceCount} rausgelegt<br><span class="text-slate-500">${remaining > 0 ? remaining + ' Würfel übrig' : 'alle Würfel gespielt'}</span>`;
+
+      playedRow.innerHTML = S.dice.played.length
+        ? S.dice.played.map(v => `<span class="bg-slate-700 border border-slate-600 rounded-lg px-1 py-1 inline-flex items-center justify-center">${dieFace(v, 'sm')}</span>`).join('')
+        : '<span class="text-[11px] text-slate-500 italic">noch keine Würfel rausgelegt</span>';
+
+      const groups = getGroups();
+      const free = hasFreeOneFive(groups);
+
+      if (S.dice.currentRoll.length) {
+        rollRow.innerHTML = S.dice.currentRoll.map(d => {
+          const g = groups.find(x => x.members.indexOf(d.i) !== -1);
+          const selected = S.dice.selected.indexOf(d.i) !== -1;
+          const clickable = (d.v === 1 || d.v === 5) && (!g || cfg.onesFivesFree);
+          let cls = 'die-btn flex items-center justify-center rounded-xl border-2 transition w-[48px] h-[48px] ';
+          if (selected) cls += 'bg-emerald-600 border-emerald-300 shadow selected ';
+          else if (clickable) cls += 'bg-white border-slate-300 hover:border-sky-400 ';
+          else cls += 'bg-slate-700 border-slate-600 disabled ';
+          return `<button class="${cls}" onclick="toggleDie(${d.i})">${dieFace(d.v)}</button>`;
+        }).join('');
+      } else {
+        const msg = (S.currentCard && S.currentCard.type !== 'stopp')
+          ? 'Tippe auf „Würfeln“.'
+          : 'Erst eine Karte ziehen.';
+        rollRow.innerHTML = `<span class="text-[11px] text-slate-500 italic">${msg}</span>`;
+      }
+
+      groupsRow.innerHTML = groups.map(g => {
+        const allSel = g.members.every(i => S.dice.selected.indexOf(i) !== -1);
+        const mandatory = g.strict && !allSel && !free;
+        let cls = 'px-3 py-1.5 rounded-xl text-[11px] font-black border-2 transition flex items-center space-x-2 ';
+        if (allSel) cls += 'bg-emerald-600 border-emerald-300 text-white ';
+        else if (mandatory) cls += 'bg-red-900/60 border-red-500 text-red-200 ';
+        else cls += 'bg-slate-700 border-slate-500 text-sky-300 hover:border-sky-400 ';
+        return `<button class="${cls}" onclick="toggleGroup(${g.v})">
+          <span>${g.count}×${g.v} Pasch</span>
+          <span class="${allSel ? 'text-white' : 'text-amber-300'}">+${groupPoints(g)}</span>
+          ${mandatory ? '<span class="text-red-300">PFLICHT</span>' : ''}
+        </button>`;
+      }).join('');
+
+      if (S.dice.currentRoll.length && hasScoringOption()) {
+        const val = validateSelection(groups, free);
+        const pts = selectedPoints(groups);
+        info.innerHTML = `<span class="${val.ok ? 'text-emerald-300' : 'text-slate-400'}">Auswahl: +${pts} Pkt</span>`
+          + (val.ok
+            ? ' <span class="text-slate-500">· bereit zum Übernehmen</span>'
+            : `<div class="text-red-300">${val.msg}</div>`);
+      } else if (S.dice.currentRoll.length) {
+        info.innerHTML = '<span class="text-red-300 font-bold">💥 Keine 1/5 und kein Pasch – Niete!</span>';
+      } else {
+        info.innerHTML = '';
+      }
+    }
+
+    // ===== SCOREBOARD & SPIELER (pro Modus) =====
     function renderScoreboard() {
       const container = document.getElementById('playerListContainer');
-      container.innerHTML = players.map((p, idx) => `
-        <div class="flex items-center justify-between bg-slate-700/60 p-2 rounded-xl border ${players[activePlayerIdx]?.id === p.id ? 'border-sky-400 bg-slate-700' : 'border-slate-600'}">
+      const modeLabelEl = document.getElementById('scoreboardModeLabel');
+      if (modeLabelEl) modeLabelEl.innerText = modeLabel(gameMode);
+      const ts = document.getElementById('targetScoreText');
+      if (ts) ts.innerText = S.targetScore;
+
+      container.innerHTML = S.players.map((p, idx) => `
+        <div class="flex items-center justify-between bg-slate-700/60 p-2 rounded-xl border ${S.players[S.activePlayerIdx] && S.players[S.activePlayerIdx].id === p.id ? 'border-sky-400 bg-slate-700' : 'border-slate-600'}">
           <div class="flex items-center space-x-2 flex-1 mr-2">
             <span class="text-xs font-bold text-slate-400 w-5">#${idx+1}</span>
             <input type="text" value="${escapeHtml(p.name)}" onchange="renamePlayer('${p.id}', this.value)" class="bg-slate-900 border border-slate-600 text-xs font-extrabold text-white px-2 py-1 rounded-lg flex-1 focus:outline-none focus:border-sky-500" />
           </div>
           <div class="flex items-center space-x-2">
             <span class="text-xs font-black text-amber-400 w-16 text-right">${p.score} Pkt</span>
-            ${players.length > 1 ? `<button onclick="removePlayer('${p.id}')" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
+            ${S.players.length > 1 ? `<button onclick="removePlayer('${p.id}')" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
           </div>
         </div>
       `).join('');
@@ -647,7 +1196,7 @@
 
     function renamePlayer(id, newName) {
       if (!newName.trim()) return;
-      const p = players.find(x => x.id === id);
+      const p = S.players.find(x => x.id === id);
       if (p) {
         p.name = newName.trim();
         updateUI();
@@ -659,51 +1208,167 @@
       const inp = document.getElementById('newPlayerInput');
       const val = inp.value.trim();
       if (!val) return;
-      players.push({ id: Date.now().toString(), name: val, score: 0 });
+      S.players.push({ id: Date.now().toString(), name: val, score: 0 });
       inp.value = '';
       updateUI();
       saveSession();
     }
 
     function removePlayer(id) {
-      if (players.length <= 1) return;
-      players = players.filter(p => p.id !== id);
-      if (activePlayerIdx >= players.length) activePlayerIdx = 0;
+      if (S.players.length <= 1) return;
+      S.players = S.players.filter(p => p.id !== id);
+      if (S.activePlayerIdx >= S.players.length) S.activePlayerIdx = 0;
       updateUI();
       saveSession();
     }
 
-    function resetScoresConfirm() {
-      if (confirm('Möchtest du alle Punkte und das Spiel wirklich zurücksetzen?')) {
-        resetGameFull();
-      }
-    }
+    // ===== RESET NUR FÜR DEN AKTUELEN MODUS =====
+    function resetActiveMode() {
+      const cfg = S.config;
+      const tgt = S.targetScore;
+      const players = S.players.map(p => ({ ...p, score: 0 }));
 
-    function resetGameFull() {
-      clearSession();
-      players.forEach(p => p.score = 0);
-      activePlayerIdx = 0;
-      turnScore = 0;
-      drawPile = createFreshDeck();
-      discardPile = [];
-      currentCard = null;
-      isTuttoAchieved = false;
+      states[gameMode] = createModeState(gameMode);
+      S = states[gameMode];
+      S.config = cfg;
+      S.targetScore = tgt;
+      S.players = players;
+      S.activePlayerIdx = 0;
+      resetDiceState();
+
       document.getElementById('winnerModal').classList.add('hidden');
       closeModal('scoreboardModal');
       document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
+      showToast('🔄 Spielstand von "' + modeLabel(gameMode) + '" zurückgesetzt.');
       updateUI();
+      saveSession();
+    }
+
+    function resetActiveModePrompt() {
+      if (confirm('Spielstand NUR des aktuellen Modus („' + modeLabel(gameMode) + '") wirklich zurücksetzen?')) {
+        resetActiveMode();
+        closeModal('settingsModal');
+      }
+    }
+
+    function resetScoresConfirm() {
+      resetActiveModePrompt();
     }
 
     function resetGamePrompt() {
-      if (confirm('Neues Spiel starten und den Spielstand zurücksetzen?')) {
-        resetGameFull();
+      if (confirm('Neues Spiel im aktuellen Modus („' + modeLabel(gameMode) + '") starten? Andere Modi bleiben erhalten.')) {
+        resetActiveMode();
       }
+    }
+
+    function reshuffleCurrentDeck() {
+      S.drawPile = createFreshDeck();
+      S.discardPile = [];
+      S.currentCard = null;
+      S.isTuttoAchieved = false;
+      if (gameMode === 'dice') resetDiceState();
+      showToast('🔄 Stapel neu gemischt.');
+      updateUI();
+      saveSession();
+    }
+
+    // ===== MODUS-EINSTELLUNGEN =====
+    function openSettingsModal() {
+      renderSettings();
+      openModal('settingsModal');
+    }
+
+    function renderSettings() {
+      const body = document.getElementById('settingsBody');
+      const inpCls = 'bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-sky-500';
+      let html = '<p class="text-[11px] text-slate-400 leading-relaxed">Aktiver Modus: <b class="text-sky-300">' + modeLabel(gameMode) + '</b>. Jeder Modus hat eigene Spieler, Punkte, Stapel & Einstellungen – getrennte Speicherung.</p>';
+
+      if (gameMode !== 'pure') {
+        html += `<div class="flex items-center justify-between bg-slate-700/50 rounded-xl p-3">
+          <span class="text-xs font-bold text-slate-200">🎯 Zielpunktzahl</span>
+          <input type="number" min="100" step="100" value="${S.targetScore}" onchange="applyConfig('targetScore', this.value)" class="${inpCls} w-24">
+        </div>`;
+      }
+
+      if (gameMode === 'pure') {
+        html += '<p class="text-[11px] text-slate-400 leading-relaxed">Im reinen Kartenstapel-Modus gibt es keine Punkte-Konfiguration. Mitspieler verwaltest du in den Punkte-Modi.</p>';
+        html += '<button onclick="reshuffleCurrentDeck()" class="w-full bg-slate-700 hover:bg-slate-600 text-sky-300 font-bold text-xs py-2.5 rounded-xl transition">🔄 Stapel komplett neu mischen</button>';
+      }
+
+      if (gameMode === 'dice') {
+        const c = S.config;
+        html += '<div class="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider pt-1">Würfel-Regeln (nur Simulation)</div>';
+        html += `<div class="flex items-center justify-between bg-slate-700/50 rounded-xl p-3">
+          <span class="text-xs font-bold text-slate-200">🎲 Würfelanzahl</span>
+          <input type="number" min="3" max="10" value="${c.diceCount}" onchange="applyConfig('dice.diceCount', this.value)" class="${inpCls} w-16">
+        </div>`;
+        html += `<div class="grid grid-cols-2 gap-2">
+          <div class="flex items-center justify-between bg-slate-700/50 rounded-xl p-2.5">
+            <span class="text-[11px] font-bold text-slate-200">1er einzeln</span>
+            <input type="number" min="0" step="10" value="${c.singleOne}" onchange="applyConfig('dice.singleOne', this.value)" class="${inpCls} w-16">
+          </div>
+          <div class="flex items-center justify-between bg-slate-700/50 rounded-xl p-2.5">
+            <span class="text-[11px] font-bold text-slate-200">5er einzeln</span>
+            <input type="number" min="0" step="10" value="${c.singleFive}" onchange="applyConfig('dice.singleFive', this.value)" class="${inpCls} w-16">
+          </div>
+        </div>`;
+        html += '<div class="bg-slate-700/50 rounded-xl p-3"><div class="text-[11px] font-bold text-slate-200 mb-2">Dreier-Pasch Punkte je Augenzahl</div><div class="grid grid-cols-3 gap-2">';
+        for (let f = 1; f <= 6; f++) {
+          html += `<label class="text-[10px] font-bold text-slate-400 block">×${f} Pasch<input type="number" min="0" step="50" value="${c.setPoints[f]}" onchange="applyConfig('dice.setPoints.${f}', this.value)" class="${inpCls} w-full mt-0.5"></label>`;
+        }
+        html += '</div></div>';
+        html += `<label class="flex items-start space-x-2 bg-slate-700/50 rounded-xl p-3 cursor-pointer">
+          <input type="checkbox" ${c.onesFivesFree ? 'checked' : ''} onchange="applyConfig('dice.onesFivesFree', this.checked)" class="mt-0.5">
+          <span class="text-[11px] font-bold text-slate-200">1en & 5en immer einzeln wählbar <span class="text-slate-400 font-semibold">(auch wenn sie einen Pasch bilden – sonst ist der Pasch nur komplett wählbar)</span></span>
+        </label>`;
+        html += `<label class="flex items-start space-x-2 bg-slate-700/50 rounded-xl p-3 cursor-pointer">
+          <input type="checkbox" ${c.streetAutoTutto ? 'checked' : ''} onchange="applyConfig('dice.streetAutoTutto', this.checked)" class="mt-0.5">
+          <span class="text-[11px] font-bold text-slate-200">Straße-Karte: Wurf 1-2-3-4-5-6 automatisch als Tutto (+2.000) werten</span>
+        </label>`;
+        html += '<p class="text-[10px] text-slate-500 leading-relaxed">Pasch-Wertung: 3 Gleiche = konfigurierter Wert, jeder weitere gleiche Würfel zählt wie ein zusätzlicher Pasch (4× = 2-fach usw.).</p>';
+      }
+
+      html += '<button onclick="resetActiveModePrompt()" class="w-full bg-red-900/40 hover:bg-red-900/60 border border-red-700 text-red-300 font-bold text-xs py-2.5 rounded-xl transition mt-2">🔄 Nur diesen Modus zurücksetzen</button>';
+
+      body.innerHTML = html;
+      lucide.createIcons();
+    }
+
+    function applyConfig(path, value) {
+      if (path === 'targetScore') {
+        const n = parseInt(value, 10);
+        if (n > 0) { S.targetScore = n; showToast('🎯 Ziel: ' + n + ' Pkt'); }
+      } else if (path.indexOf('dice.') === 0) {
+        const key = path.slice(5);
+        if (key === 'onesFivesFree' || key === 'streetAutoTutto') {
+          S.config[key] = !!value;
+        } else if (key.indexOf('setPoints.') === 0) {
+          const f = Number(key.split('.')[1]);
+          const n = parseInt(value, 10);
+          if (f >= 1 && f <= 6 && !isNaN(n) && n >= 0) S.config.setPoints[f] = n;
+        } else if (key === 'diceCount') {
+          const n = parseInt(value, 10);
+          if (n >= 1 && n <= 12) {
+            S.config.diceCount = n;
+            if (S.dice.played.length > n || S.dice.currentRoll.length > n) {
+              resetDiceState();
+              showToast('🎲 Laufender Würfelsatz durch neue Würfelanzahl zurückgesetzt.');
+            }
+          }
+        } else {
+          const n = parseInt(value, 10);
+          if (!isNaN(n) && n >= 0) S.config[key] = n;
+        }
+      }
+      saveSession();
+      updateUI();
+      renderSettings();
     }
 
     function renderInspector() {
       const container = document.getElementById('inspectorList');
       container.innerHTML = Object.values(CARD_TYPES).map(t => {
-        const count = drawPile.filter(c => c.type === t.type).length;
+        const count = S.drawPile.filter(c => c.type === t.type).length;
         return `
           <div class="flex items-center justify-between bg-slate-700/50 p-2 rounded-xl text-xs">
             <span class="font-bold text-slate-200">${t.title}</span>
@@ -719,18 +1384,16 @@
     window.onload = () => {
       lucide.createIcons();
       
-      // Attempt restoring saved session
+      // Attempt restoring saved session (pro Modus getrennt)
       const restored = loadSession();
       if (restored) {
         selectGameMode(gameMode);
-        document.getElementById('closeModeBtn').classList.remove('hidden');
         closeModal('modeSelectModal');
-        showToast('💾 Spielstand automatisch wiederhergestellt!');
+        showToast('💾 Spielstand wiederhergestellt – Modus: ' + modeLabel(gameMode) + '!');
       } else {
         openModal('modeSelectModal');
+        updateUI();
       }
-
-      updateUI();
     };
   </script>
 </body>
