@@ -74,7 +74,7 @@
         <i data-lucide="trophy" class="w-5 h-5 text-amber-400"></i>
       </button>
 
-      <button onclick="resetGamePrompt()" class="p-2 text-slate-300 hover:text-white transition">
+      <button onclick="resetGamePrompt()" class="p-2 text-slate-300 hover:text-white transition" title="Neues Spiel">
         <i data-lucide="rotate-ccw" class="w-5 h-5 text-slate-400"></i>
       </button>
     </div>
@@ -189,7 +189,6 @@
       <p class="text-xs text-center text-slate-400 mb-5 font-semibold">Wähle deinen bevorzugten Spielmodus:</p>
 
       <div class="space-y-3 mb-6">
-        <!-- MODE 1: FULL GAME -->
         <button onclick="selectGameMode('full')" class="w-full bg-slate-700 hover:bg-slate-600 border-2 border-sky-500/80 p-4 rounded-2xl text-left transition flex items-start space-x-3">
           <i data-lucide="trophy" class="w-7 h-7 text-amber-400 mt-0.5"></i>
           <div>
@@ -198,7 +197,6 @@
           </div>
         </button>
 
-        <!-- MODE 2: PURE DECK -->
         <button onclick="selectGameMode('pure')" class="w-full bg-slate-700 hover:bg-slate-600 border-2 border-slate-600 p-4 rounded-2xl text-left transition flex items-start space-x-3">
           <i data-lucide="layers" class="w-7 h-7 text-sky-400 mt-0.5"></i>
           <div>
@@ -225,12 +223,10 @@
         </button>
       </div>
 
-      <!-- PLAYER LIST WITH RENAME INPUTS -->
       <div id="playerListContainer" class="space-y-2 mb-4 max-h-56 overflow-y-auto">
         <!-- Rendered by JS -->
       </div>
 
-      <!-- ADD PLAYER & RESET -->
       <div class="border-t border-slate-700 pt-3">
         <div class="flex space-x-2 mb-3">
           <input id="newPlayerInput" type="text" placeholder="Neuer Spieler Name..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500" />
@@ -329,7 +325,61 @@
     let turnScore = 0;
     let targetScore = 6000;
     let kleeblattCount = 0;
-    let isTuttoAchieved = false; // Tracks if TUTTO was hit on current card
+    let isTuttoAchieved = false;
+
+    // --- LOCAL STORAGE SESSION PERSISTENCE ---
+    const STORAGE_KEY = 'tutto_app_session_v1';
+
+    function saveSession() {
+      try {
+        const state = {
+          gameMode,
+          drawPile,
+          discardPile,
+          currentCard,
+          players,
+          activePlayerIdx,
+          turnScore,
+          targetScore,
+          kleeblattCount,
+          isTuttoAchieved,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.warn('Session autosave error', e);
+      }
+    }
+
+    function loadSession() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const state = JSON.parse(raw);
+        if (!state || !state.players) return false;
+
+        gameMode = state.gameMode || 'full';
+        drawPile = state.drawPile || createFreshDeck();
+        discardPile = state.discardPile || [];
+        currentCard = state.currentCard || null;
+        players = state.players || players;
+        activePlayerIdx = state.activePlayerIdx || 0;
+        turnScore = state.turnScore || 0;
+        targetScore = state.targetScore || 6000;
+        kleeblattCount = state.kleeblattCount || 0;
+        isTuttoAchieved = state.isTuttoAchieved || false;
+
+        return true;
+      } catch (e) {
+        console.warn('Session load error', e);
+        return false;
+      }
+    }
+
+    function clearSession() {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {}
+    }
 
     function selectGameMode(mode) {
       gameMode = mode;
@@ -349,10 +399,9 @@
         document.getElementById('deckModeBadge').classList.add('hidden');
         document.getElementById('fullGameSection').classList.remove('hidden');
         document.getElementById('pureDeckSection').classList.add('hidden');
-        // Show scoreboard for player setup if starting fresh
-        openModal('scoreboardModal');
       }
       updateUI();
+      saveSession();
     }
 
     function updateUI() {
@@ -362,13 +411,33 @@
       document.getElementById('deckCounter').innerText = `${drawPile.length} / 56`;
       document.getElementById('turnScoreValue').innerText = turnScore;
 
+      // Update Card Visual state if restored
+      if (currentCard) {
+        const cardFront = document.getElementById('cardFront');
+        cardFront.className = `absolute inset-0 backface-hidden rotate-y-180 rounded-3xl border-4 flex flex-col justify-between overflow-hidden shadow-2xl ${currentCard.bg} ${currentCard.border}`;
+        
+        document.getElementById('cardBanner').className = `${currentCard.bannerBg} text-white py-3 text-center`;
+        document.getElementById('cardBadge').className = `${currentCard.bannerBg} text-white font-black text-2xl px-5 py-1.5 rounded-full mb-3 shadow`;
+        document.getElementById('cardBadge').innerText = currentCard.badge;
+
+        document.getElementById('cardTitle').innerText = currentCard.title;
+        document.getElementById('cardDescription').innerText = currentCard.desc;
+        document.getElementById('cardFooterText').innerText = `Karte ${discardPile.length + 1} von 56`;
+
+        const iconEl = document.getElementById('cardIcon');
+        iconEl.setAttribute('data-lucide', currentCard.icon);
+        
+        document.getElementById('cardInner').style.transform = 'rotateY(180deg)';
+      } else {
+        document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
+      }
+
       renderControls();
       renderScoreboard();
       renderInspector();
       lucide.createIcons();
     }
 
-    // DYNAMIC CONTROL BUTTON RENDERER FOR FULL GAME MODE
     function renderControls() {
       const container = document.getElementById('controlsContainer');
       const pName = (players[activePlayerIdx] || players[0]).name;
@@ -392,7 +461,6 @@
           </button>
         `;
       } else if (isTuttoAchieved) {
-        // AFTER TUTTO: OPTIONS TO DRAW NEXT CARD IN SAME TURN OR BANK POINTS
         document.getElementById('btnTutto').classList.add('hidden');
         document.getElementById('diceQuickSection').classList.add('hidden');
         container.innerHTML = `
@@ -408,7 +476,6 @@
           </div>
         `;
       } else {
-        // REGULAR TURN IN PROGRESS
         document.getElementById('btnTutto').classList.remove('hidden');
         document.getElementById('diceQuickSection').classList.remove('hidden');
         container.innerHTML = `
@@ -433,7 +500,6 @@
       setTimeout(() => t.classList.add('hidden'), 4000);
     }
 
-    // --- DRAW CARD ---
     function drawCard() {
       if (drawPile.length === 0) {
         if (discardPile.length === 0) drawPile = createFreshDeck();
@@ -445,34 +511,16 @@
       currentCard = drawPile.pop();
       isTuttoAchieved = false;
 
-      // Update Card Visuals
-      const cardFront = document.getElementById('cardFront');
-      cardFront.className = `absolute inset-0 backface-hidden rotate-y-180 rounded-3xl border-4 flex flex-col justify-between overflow-hidden shadow-2xl ${currentCard.bg} ${currentCard.border}`;
-      
-      document.getElementById('cardBanner').className = `${currentCard.bannerBg} text-white py-3 text-center`;
-      document.getElementById('cardBadge').className = `${currentCard.bannerBg} text-white font-black text-2xl px-5 py-1.5 rounded-full mb-3 shadow`;
-      document.getElementById('cardBadge').innerText = currentCard.badge;
-
-      document.getElementById('cardTitle').innerText = currentCard.title;
-      document.getElementById('cardDescription').innerText = currentCard.desc;
-      document.getElementById('cardFooterText').innerText = `Karte ${discardPile.length + 1} von 56`;
-
-      const iconEl = document.getElementById('cardIcon');
-      iconEl.setAttribute('data-lucide', currentCard.icon);
-      
-      document.getElementById('cardInner').style.transform = 'rotateY(180deg)';
-
       if (currentCard.type === 'stopp' && gameMode === 'full') {
         showToast('🔴 STOPP-Karte gezogen! Zug endet mit 0 Punkten.');
         turnScore = 0;
       }
 
       updateUI();
+      saveSession();
     }
 
-    // DRAW NEXT CARD IN SAME TURN (TUTTO CHAINING)
     function drawCardInSameTurn() {
-      // Flip back cover briefly then draw
       document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
       setTimeout(() => {
         drawCard();
@@ -483,9 +531,9 @@
       if (!currentCard || currentCard.type === 'stopp') return;
       turnScore += pts;
       updateUI();
+      saveSession();
     }
 
-    // --- TUTTO ACHIEVED (AUTOMATIC BONUS & CONTINUATION PROMPT) ---
     function triggerTutto() {
       if (!currentCard || isTuttoAchieved) return;
 
@@ -516,6 +564,7 @@
         kleeblattCount++;
         if (kleeblattCount >= 2) {
           showWinner(players[activePlayerIdx].name, '🍀 SOFORT-SIEG durch 2x Tutto bei Kleeblatt!');
+          saveSession();
           return;
         } else {
           msg = `1 von 2 Tuttos geschafft! Noch 1 Tutto für den SOFORT-SIEG!`;
@@ -524,9 +573,9 @@
 
       showToast(`🎉 TUTTO! ${msg} Ziehe eine neue Karte zum Weiterzocken oder sichere deine Punkte.`);
       updateUI();
+      saveSession();
     }
 
-    // --- NIETE / GAMBLE LOST (ALL TURN POINTS WIPED OUT IN RUN!) ---
     function triggerNiete() {
       if (currentCard && currentCard.type === 'feuerwerk') {
         bankPointsAndEnd(`Feuerwerk beendet! ${turnScore} Punkte gesichert.`);
@@ -546,6 +595,7 @@
       
       if (players[activePlayerIdx].score >= targetScore) {
         showWinner(pName, `Zielpunktzahl von ${targetScore} Punkten erreicht!`);
+        saveSession();
         return;
       }
 
@@ -566,6 +616,7 @@
 
       document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
       updateUI();
+      saveSession();
     }
 
     function showWinner(name, reason) {
@@ -574,10 +625,8 @@
       document.getElementById('winnerModal').classList.remove('hidden');
     }
 
-    // --- SCOREBOARD RENDER & INLINE PLAYER RENAMING ---
     function renderScoreboard() {
       const container = document.getElementById('playerListContainer');
-      
       container.innerHTML = players.map((p, idx) => `
         <div class="flex items-center justify-between bg-slate-700/60 p-2 rounded-xl border ${players[activePlayerIdx]?.id === p.id ? 'border-sky-400 bg-slate-700' : 'border-slate-600'}">
           <div class="flex items-center space-x-2 flex-1 mr-2">
@@ -602,6 +651,7 @@
       if (p) {
         p.name = newName.trim();
         updateUI();
+        saveSession();
       }
     }
 
@@ -612,6 +662,7 @@
       players.push({ id: Date.now().toString(), name: val, score: 0 });
       inp.value = '';
       updateUI();
+      saveSession();
     }
 
     function removePlayer(id) {
@@ -619,6 +670,7 @@
       players = players.filter(p => p.id !== id);
       if (activePlayerIdx >= players.length) activePlayerIdx = 0;
       updateUI();
+      saveSession();
     }
 
     function resetScoresConfirm() {
@@ -628,6 +680,7 @@
     }
 
     function resetGameFull() {
+      clearSession();
       players.forEach(p => p.score = 0);
       activePlayerIdx = 0;
       turnScore = 0;
@@ -642,7 +695,7 @@
     }
 
     function resetGamePrompt() {
-      if (confirm('Neues Spiel starten und den Stapel neu mischen?')) {
+      if (confirm('Neues Spiel starten und den Spielstand zurücksetzen?')) {
         resetGameFull();
       }
     }
@@ -665,8 +718,18 @@
 
     window.onload = () => {
       lucide.createIcons();
-      // Show startup mode selector modal
-      openModal('modeSelectModal');
+      
+      // Attempt restoring saved session
+      const restored = loadSession();
+      if (restored) {
+        selectGameMode(gameMode);
+        document.getElementById('closeModeBtn').classList.remove('hidden');
+        closeModal('modeSelectModal');
+        showToast('💾 Spielstand automatisch wiederhergestellt!');
+      } else {
+        openModal('modeSelectModal');
+      }
+
       updateUI();
     };
   </script>
