@@ -211,7 +211,7 @@
     </div>
 
     <div class="mb-3">
-      <div class="text-[9px] text-slate-500 font-extrabold uppercase tracking-wider mb-1">Dein Wurf – 1en/5en antippen, Pasch-Button nutzen</div>
+      <div class="text-[9px] text-slate-500 font-extrabold uppercase tracking-wider mb-1">Dein Wurf – 1er/5er einzeln antippen, Pasch-Würfel wählen den ganzen Pasch</div>
       <div id="diceRollRow" class="flex flex-wrap gap-2 items-center min-h-[50px]"></div>
       <div id="diceGroupsRow" class="flex flex-wrap gap-2 mt-2"></div>
       <div id="diceSelectionInfo" class="text-[11px] font-bold mt-2 leading-snug"></div>
@@ -817,7 +817,6 @@
 
     function getGroups() {
       const loose = S.config.onesFivesFree;
-      const sel = S.dice.selected;
       const counts = {};
       S.dice.currentRoll.forEach(d => { counts[d.v] = (counts[d.v] || 0) + 1; });
       const groups = [];
@@ -826,11 +825,6 @@
         if (counts[v] < 3) return;
         const members = S.dice.currentRoll.filter(d => d.v === v).map(d => d.i);
         const strict = !(loose && (v === 1 || v === 5));
-        if (!strict) {
-          const selM = members.filter(i => sel.indexOf(i) !== -1);
-          // Einzeln angebrochener 1er/5er-Pasch zählt nicht mehr als Pasch-Option
-          if (selM.length > 0 && selM.length < members.length) return;
-        }
         groups.push({ v, members, count: members.length, strict });
       });
       return groups;
@@ -943,20 +937,24 @@
       const g = groups.find(x => x.members.indexOf(i) !== -1);
       const isOneFive = d.v === 1 || d.v === 5;
 
-      if (!isOneFive) {
-        if (g) showToast(`ℹ️ ${g.count}×${g.v} nur komplett als Pasch wählbar!`);
-        else showToast('ℹ️ Nur 1en, 5en und Pasch-Würfel sind Wertwürfel.');
+      // Klick auf einen Pasch-Würfel wählt den ganzen Pasch an/ab
+      if (g && (!isOneFive || !S.config.onesFivesFree)) {
+        toggleGroupInternal(g);
         return;
       }
-      if (g && !S.config.onesFivesFree) {
-        showToast(`ℹ️ ${g.count}×${g.v} nur komplett als Pasch wählbar!`);
+      if (!g && !isOneFive) {
+        showToast('ℹ️ Nur 1en, 5en und Pasch-Würfel sind Wertwürfel.');
         return;
       }
 
       if (g) {
-        // Einzelne 1/5 antippen bricht den Pasch auf (nur wenn 1/5 frei wählbar)
-        const others = g.members.filter(m => m !== i);
-        S.dice.selected = S.dice.selected.filter(s => others.indexOf(s) === -1);
+        // Pasch komplett angewählt -> Klick auf einen Würfel wählt den Pasch ab
+        const allSel = g.members.every(m => S.dice.selected.indexOf(m) !== -1);
+        if (allSel) {
+          S.dice.selected = S.dice.selected.filter(m => g.members.indexOf(m) === -1);
+          refreshDice();
+          return;
+        }
       }
       const idx = S.dice.selected.indexOf(i);
       if (idx === -1) S.dice.selected.push(i);
@@ -965,13 +963,16 @@
       refreshDice();
     }
 
-    function toggleGroup(v) {
-      const g = getGroups().find(x => x.v === v);
-      if (!g) return;
+    function toggleGroupInternal(g) {
       const allSel = g.members.every(i => S.dice.selected.indexOf(i) !== -1);
       S.dice.selected = S.dice.selected.filter(i => g.members.indexOf(i) === -1);
       if (!allSel) S.dice.selected = S.dice.selected.concat(g.members);
       refreshDice();
+    }
+
+    function toggleGroup(v) {
+      const g = getGroups().find(x => x.v === v);
+      if (g) toggleGroupInternal(g);
     }
 
     function confirmSelection() {
@@ -1126,15 +1127,13 @@
         rollRow.innerHTML = S.dice.currentRoll.map(d => {
           const g = groups.find(x => x.members.indexOf(d.i) !== -1);
           const selected = S.dice.selected.indexOf(d.i) !== -1;
-          const clickable = (d.v === 1 || d.v === 5) && (!g || cfg.onesFivesFree);
+          const isOneFive = d.v === 1 || d.v === 5;
           let cls = 'die-btn flex items-center justify-center rounded-xl border-2 transition w-[48px] h-[48px] ';
           if (selected) cls += 'bg-emerald-600 border-emerald-300 shadow selected ';
-          else if (clickable) cls += 'bg-white border-slate-300 hover:border-sky-400 ';
+          else if (g) cls += 'bg-white border-amber-500/70 hover:border-amber-400 ';
+          else if (isOneFive) cls += 'bg-white border-slate-300 hover:border-sky-400 ';
           else cls += 'bg-slate-700 border-slate-600 disabled ';
-          const content = (!clickable && !selected)
-            ? `<span class="text-2xl font-black text-slate-100">${d.v}</span>`
-            : dieFace(d.v);
-          return `<button class="${cls}" onclick="toggleDie(${d.i})">${content}</button>`;
+          return `<button class="${cls}" onclick="toggleDie(${d.i})">${dieFace(d.v)}</button>`;
         }).join('');
       } else {
         const msg = (S.currentCard && S.currentCard.type !== 'stopp')
