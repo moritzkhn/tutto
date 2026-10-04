@@ -212,7 +212,6 @@ export default function App() {
   const [drawPile, setDrawPile] = useState(() => createFreshDeck());
   const [discardPile, setDiscardPile] = useState([]);
   const [currentCard, setCurrentCard] = useState(null);
-  const [reshuffledNotice, setReshuffledNotice] = useState(false);
 
   // Modals
   const [showInspector, setShowInspector] = useState(false);
@@ -251,7 +250,6 @@ export default function App() {
 
     let currentDrawPile = [...drawPile];
     let currentDiscardPile = [...discardPile];
-    let notice = false;
 
     // Check if deck needs reshuffle
     if (currentDrawPile.length === 0) {
@@ -262,7 +260,6 @@ export default function App() {
         currentDrawPile = shuffle([...currentDiscardPile]);
         currentDiscardPile = [];
       }
-      notice = true;
     }
 
     const drawnCard = currentDrawPile.pop();
@@ -274,11 +271,6 @@ export default function App() {
     setDrawPile(currentDrawPile);
     setDiscardPile(currentDiscardPile);
     setCurrentCard(drawnCard);
-    setReshuffledNotice(notice);
-
-    if (notice) {
-      setTimeout(() => setReshuffledNotice(false), 3000);
-    }
 
     animateCardDraw();
   };
@@ -310,7 +302,6 @@ export default function App() {
     setDrawPile(createFreshDeck());
     setDiscardPile([]);
     setCurrentCard(null);
-    setReshuffledNotice(false);
   };
 
   // Calculate remaining cards breakdown for Inspector
@@ -385,14 +376,6 @@ export default function App() {
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* RESHUFFLE NOTIFICATION TOAST */}
-      {reshuffledNotice && (
-        <View style={styles.reshuffleToast}>
-          <Ionicons name="sync-circle" size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
-          <Text style={styles.reshuffleToastText}>Stapel leer – Karten neu gemischt!</Text>
-        </View>
-      )}
 
       {/* MAIN CARD CONTAINER */}
       <View style={styles.cardArea}>
@@ -659,19 +642,6 @@ const styles = StyleSheet.create({
   headerIconButton: {
     padding: 6,
     marginLeft: 6,
-  },
-  reshuffleToast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2563EB',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  reshuffleToastText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
   },
   cardArea: {
     flex: 1,

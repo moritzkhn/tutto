@@ -213,7 +213,6 @@ export default function App() {
   const [showScoreboard, setShowScoreboard] = useState(false);
   const [showPlayerSetup, setShowPlayerSetup] = useState(false);
   const [showInspector, setShowInspector] = useState(false);
-  const [toastMsg, setToastMsg] = useState(null);
   const [winnerModal, setWinnerModal] = useState(null);
 
   // New Player Name Input
@@ -222,11 +221,6 @@ export default function App() {
   // Animation values
   const flipAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const triggerToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
-  };
 
   const animateCard = () => {
     scaleAnim.setValue(0.95);
@@ -252,7 +246,6 @@ export default function App() {
         currentDrawPile = shuffle([...currentDiscardPile]);
         currentDiscardPile = [];
       }
-      triggerToast('🔄 Stapel leer – Karten neu gemischt!');
     }
 
     const drawnCard = currentDrawPile.pop();
@@ -267,7 +260,6 @@ export default function App() {
 
     // EDGE-CASE 1: STOPP CARD
     if (drawnCard.category === 'stopp') {
-      triggerToast('🔴 STOPP-Karte gezogen! Zug endet mit 0 Punkten.');
       // Turn score for this round becomes 0
       setTurnScore(0);
     }
@@ -275,15 +267,8 @@ export default function App() {
 
   // --- ADD DICE POINTS ---
   const handleAddDicePoints = (amount) => {
-    if (!currentCard) {
-      triggerToast('⚠️ Bitte zuerst eine Karte ziehen!');
-      return;
-    }
-
-    if (currentCard.category === 'stopp') {
-      triggerToast('❌ Bei einer STOPP-Karte kannst du keine Punkte erzielen!');
-      return;
-    }
+    if (!currentCard) return;
+    if (currentCard.category === 'stopp') return;
 
     const val = parseInt(amount, 10);
     if (isNaN(val) || val <= 0) return;
@@ -299,24 +284,20 @@ export default function App() {
     if (Platform.OS !== 'web') Vibration.vibrate([0, 50, 50, 50]);
 
     let newTurnScore = turnScore;
-    let bonusAppliedText = '';
 
     // EDGE-CASE 2: BONUS CARDS (+200..+600)
     if (currentCard.category === 'bonus' && currentCard.bonusVal) {
       newTurnScore += currentCard.bonusVal;
-      bonusAppliedText = `+${currentCard.bonusVal} Bonus hinzugefügt!`;
     }
 
     // EDGE-CASE 3: STRASSE CARD (Direct 2000 Pts)
     else if (currentCard.category === 'strasse') {
       newTurnScore += 2000;
-      bonusAppliedText = `+2000 Punkte für Straße!`;
     }
 
     // EDGE-CASE 4: ×2 DOUBLE CARD
     else if (currentCard.category === 'double') {
       newTurnScore = newTurnScore * 2;
-      bonusAppliedText = `Punkte verdoppelt (×2)!`;
     }
 
     // EDGE-CASE 5: PLUS / MINUS CARD (+1000 to current, -1000 to leader)
@@ -339,9 +320,6 @@ export default function App() {
         const oldScore = updatedPlayers[leaderIdx].score;
         updatedPlayers[leaderIdx].score = Math.max(0, oldScore - 1000);
         setPlayers(updatedPlayers);
-        bonusAppliedText = `+1000 Pkt! Führender (${updatedPlayers[leaderIdx].name}) verliert 1.000 Pkt.`;
-      } else {
-        bonusAppliedText = `+1000 Pkt! (Kein anderer Führender mit Punkten zum Abziehen).`;
       }
     }
 
@@ -359,33 +337,23 @@ export default function App() {
         });
         setTurnScore(newTurnScore);
         return;
-      } else {
-        bonusAppliedText = `1 von 2 Tuttos geschafft! Noch 1 Tutto für den SOFORT-SIEG!`;
       }
     }
 
     setTurnScore(newTurnScore);
-    triggerToast(`🎉 TUTTO! ${bonusAppliedText}`);
   };
 
   // --- EDGE-CASE 7: NIETE / GAMBLE LOST (VERZOCKT) ---
   const handleNieteGambleLost = () => {
     if (Platform.OS !== 'web') Vibration.vibrate(200);
 
-    const activePlayer = players[activePlayerIdx];
-
     // EDGE-CASE 8: FEUERWERK CARD -> Points accumulated so far ARE KEPT!
     if (currentCard && currentCard.category === 'feuerwerk') {
-      if (turnScore > 0) {
-        saveTurnAndNextPlayer(turnScore, `Feuerwerk beendet! ${turnScore} Punkte gesichert.`);
-      } else {
-        saveTurnAndNextPlayer(0, `Feuerwerk Niete mit 0 Punkten.`);
-      }
+      saveTurnAndNextPlayer(turnScore);
     } else {
       // Normal Niete: All turn points lost!
       setTurnScore(0);
       setKleeblattTuttoCount(0);
-      triggerToast(`💥 NIETE / VERZOCKT! ${activePlayer.name} verliert alle Punkte dieser Runde.`);
       advanceToNextPlayer();
     }
   };
@@ -395,15 +363,15 @@ export default function App() {
     if (turnScore === 0 && currentCard?.category !== 'stopp') {
       Alert.alert('0 Punkte', 'Möchtest du deinen Zug wirklich mit 0 Punkten beenden?', [
         { text: 'Abbrechen', style: 'cancel' },
-        { text: 'Zug beenden', onPress: () => saveTurnAndNextPlayer(0, 'Zug mit 0 Punkten beendet.') },
+        { text: 'Zug beenden', onPress: () => saveTurnAndNextPlayer(0) },
       ]);
       return;
     }
 
-    saveTurnAndNextPlayer(turnScore, `${turnScore} Punkte gesichert!`);
+    saveTurnAndNextPlayer(turnScore);
   };
 
-  const saveTurnAndNextPlayer = (pointsToBank, msg) => {
+  const saveTurnAndNextPlayer = (pointsToBank) => {
     const updatedPlayers = [...players];
     const newTotal = updatedPlayers[activePlayerIdx].score + pointsToBank;
     updatedPlayers[activePlayerIdx].score = newTotal;
@@ -411,7 +379,6 @@ export default function App() {
     setPlayers(updatedPlayers);
     setTurnScore(0);
     setKleeblattTuttoCount(0);
-    triggerToast(`✅ ${players[activePlayerIdx].name}: ${msg}`);
 
     // Check target score win
     if (newTotal >= targetScore) {
@@ -498,13 +465,6 @@ export default function App() {
           <Text style={styles.deckBadgeTopText}>{drawPile.length} / 56</Text>
         </TouchableOpacity>
       </View>
-
-      {/* TOAST MESSAGE */}
-      {toastMsg && (
-        <View style={styles.toastBanner}>
-          <Text style={styles.toastBannerText}>{toastMsg}</Text>
-        </View>
-      )}
 
       {/* MAIN GAME CONTENT */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -823,17 +783,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     marginLeft: 6,
-  },
-  toastBanner: {
-    backgroundColor: '#2563EB',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  toastBannerText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
   },
   scrollContent: {
     padding: 16,

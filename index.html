@@ -101,11 +101,6 @@
     </div>
   </header>
 
-  <!-- TOAST BANNER -->
-  <div id="toastBanner" class="hidden bg-blue-600 text-white text-xs font-bold py-2 px-4 text-center transition-all animate-pulse">
-    <span id="toastText">Hinweis</span>
-  </div>
-
   <!-- MAIN CARD AREA -->
   <main class="flex-1 flex flex-col items-center justify-center p-4 relative">
     
@@ -658,18 +653,10 @@
       }
     }
 
-    function showToast(msg) {
-      const t = document.getElementById('toastBanner');
-      document.getElementById('toastText').innerText = msg;
-      t.classList.remove('hidden');
-      setTimeout(() => t.classList.add('hidden'), 4000);
-    }
-
     function drawCard() {
       if (S.drawPile.length === 0) {
         if (S.discardPile.length === 0) S.drawPile = createFreshDeck();
         else { S.drawPile = shuffle(S.discardPile); S.discardPile = []; }
-        showToast('🔄 Stapel leer – Karten neu gemischt!');
       }
 
       if (S.currentCard) S.discardPile.push(S.currentCard);
@@ -677,7 +664,6 @@
       S.isTuttoAchieved = false;
 
       if (S.currentCard.type === 'stopp' && (gameMode === 'full' || gameMode === 'dice')) {
-        showToast('🔴 STOPP-Karte gezogen! Zug endet mit 0 Punkten.');
         S.turnScore = 0;
       }
 
@@ -705,12 +691,10 @@
     // ===== NUR GESAMTES SPIEL: MANUELLE NIETE =====
     function triggerNiete() {
       if (S.currentCard && S.currentCard.type === 'feuerwerk') {
-        bankPointsAndEnd(`Feuerwerk beendet! ${S.turnScore} Punkte gesichert.`);
+        bankPointsAndEnd();
       } else {
-        const pName = S.players[S.activePlayerIdx].name;
         S.turnScore = 0;
         S.kleeblattCount = 0;
-        showToast(`💥 VERZOCKT! ${pName} verliert alle gesammelten Punkte dieser Runde.`);
         nextPlayer();
       }
     }
@@ -720,14 +704,11 @@
       if (!S.currentCard || S.isTuttoAchieved) return;
 
       S.isTuttoAchieved = true;
-      let msg = '';
 
       if (S.currentCard.bonusVal) {
         S.turnScore += S.currentCard.bonusVal;
-        msg = `+${S.currentCard.bonusVal} Bonus hinzugefügt!`;
       } else if (S.currentCard.type === 'double') {
         S.turnScore = S.turnScore * 2;
-        msg = `Punkte verdoppelt (×2)!`;
       } else if (S.currentCard.type === 'plus_minus') {
         S.turnScore += 1000;
         let max = -1, leaderIdx = -1;
@@ -738,9 +719,6 @@
         });
         if (leaderIdx !== -1) {
           S.players[leaderIdx].score = Math.max(0, S.players[leaderIdx].score - 1000);
-          msg = `+1000 Pkt! Führender (${S.players[leaderIdx].name}) verliert 1.000 Pkt.`;
-        } else {
-          msg = `+1000 Pkt!`;
         }
       } else if (S.currentCard.type === 'kleeblatt') {
         S.kleeblattCount++;
@@ -748,28 +726,23 @@
           showWinner(S.players[S.activePlayerIdx].name, '🍀 SOFORT-SIEG durch 2x Tutto bei Kleeblatt!');
           saveSession();
           return;
-        } else {
-          msg = `1 von 2 Tuttos geschafft! Noch 1 Tutto für den SOFORT-SIEG!`;
         }
       }
 
-      showToast(`🎉 TUTTO! ${msg}`);
       updateUI();
       saveSession();
     }
 
-    function bankPointsAndEnd(customMsg) {
+    function bankPointsAndEnd() {
       S.players[S.activePlayerIdx].score += S.turnScore;
-      const banked = S.turnScore;
       const pName = S.players[S.activePlayerIdx].name;
-      
+
       if (S.players[S.activePlayerIdx].score >= S.targetScore) {
         showWinner(pName, `Zielpunktzahl von ${S.targetScore} Punkten erreicht!`);
         saveSession();
         return;
       }
 
-      showToast(customMsg || `✅ ${pName}: ${banked} Punkte gesichert!`);
       nextPlayer();
     }
 
@@ -919,10 +892,7 @@
 
     function rollDice() {
       if (gameMode !== 'dice') return;
-      if (!S.currentCard || S.currentCard.type === 'stopp') {
-        showToast('⚠️ Bitte zuerst eine Karte ziehen!');
-        return;
-      }
+      if (!S.currentCard || S.currentCard.type === 'stopp') return;
       if (S.dice.currentRoll.length) return;
 
       const cfg = S.config;
@@ -939,7 +909,6 @@
 
         const hasNew = svals.some(v => S.dice.street.indexOf(v) === -1);
         if (!hasNew) {
-          showToast('🚂💥 Wurf ohne neue Augenzahl – Straße-Niete!');
           updateUI();
           saveSession();
           setTimeout(() => { applyNieteFromRoll(); }, 1200);
@@ -959,7 +928,6 @@
       S.dice.selected = [];
 
       if (!hasScoringOption()) {
-        showToast('💥 Wurf ohne 1/5 und ohne Pasch…');
         updateUI();
         saveSession();
         setTimeout(() => { applyNieteFromRoll(); }, 1200);
@@ -976,14 +944,11 @@
 
       // Straße-Modus: pro noch fehlender Augenzahl genau einen Würfel legen
       if (isStraightMode()) {
-        if (S.dice.street.indexOf(d.v) !== -1) {
-          showToast(`ℹ️ ${d.v} ist bei der Straße bereits gesammelt.`);
-          return;
-        }
+        if (S.dice.street.indexOf(d.v) !== -1) return;
         const idx = S.dice.selected.indexOf(i);
         if (idx === -1) {
           const other = S.dice.currentRoll.find(x => x.v === d.v && x.i !== i && S.dice.selected.indexOf(x.i) !== -1);
-          if (other) { showToast('ℹ️ Pro Augenzahl nur einen Würfel legen!'); return; }
+          if (other) return;
           S.dice.selected.push(i);
         } else {
           S.dice.selected.splice(idx, 1);
@@ -1001,10 +966,7 @@
         toggleGroupInternal(g);
         return;
       }
-      if (!g && !isOneFive) {
-        showToast('ℹ️ Nur 1en, 5en und Pasch-Würfel sind Wertwürfel.');
-        return;
-      }
+      if (!g && !isOneFive) return;
 
       if (g) {
         // Pasch komplett angewählt -> Klick auf einen Würfel wählt den Pasch ab
@@ -1037,7 +999,7 @@
     function confirmSelection() {
       // Straße-Modus: gewählte neue Augenzahlen einheimsen
       if (isStraightMode()) {
-        if (!S.dice.selected.length) { showToast('⚠️ Straße: Mindestens eine neue Augenzahl auswählen!'); return; }
+        if (!S.dice.selected.length) return;
         const nums = S.dice.selected
           .map(i => { const d = S.dice.currentRoll.find(x => x.i === i); return d ? d.v : null; })
           .filter(v => v !== null);
@@ -1046,10 +1008,8 @@
         S.dice.selected = [];
         if (S.dice.street.length >= 6) {
           S.dice.played = S.dice.street.slice().sort();
-          showToast('🚂 STRAẞE vollendet – alle Augenzahlen 1–6 gesammelt!');
           triggerTutto();
         } else {
-          showToast(`🚂 Straße: ${S.dice.street.length}/6 Augenzahlen gesammelt.`);
           updateUI();
           saveSession();
         }
@@ -1058,7 +1018,7 @@
 
       const groups = getGroups();
       const v = validateSelection(groups);
-      if (!v.ok) { showToast('⚠️ ' + v.msg); return; }
+      if (!v.ok) return;
 
       const pts = selectedPoints(groups);
       const chosen = S.dice.currentRoll.filter(d => S.dice.selected.indexOf(d.i) !== -1);
@@ -1071,7 +1031,6 @@
       if (S.dice.played.length >= cfg.diceCount) {
         triggerTutto();
       } else {
-        showToast(`✅ +${pts} Pkt rausgelegt. Noch ${cfg.diceCount - S.dice.played.length} Würfel übrig.`);
         updateUI();
         saveSession();
       }
@@ -1082,13 +1041,11 @@
       S.dice.currentRoll = [];
       S.dice.selected = [];
       if (S.currentCard && S.currentCard.type === 'feuerwerk') {
-        bankPointsAndEnd(`🎆 Feuerwerk-Niete! ${S.turnScore} Punkte bleiben gesichert.`);
+        bankPointsAndEnd();
       } else {
         S.turnScore = 0;
         S.kleeblattCount = 0;
-        const reason = isStraightMode() ? 'keine neue Augenzahl' : 'keine 1/5 und kein Pasch';
         resetDiceState();
-        showToast(`💥 NIETE! ${reason} – Rundenpunkte verloren.`);
         nextPlayer();
       }
     }
@@ -1386,7 +1343,6 @@
       document.getElementById('winnerModal').classList.add('hidden');
       closeModal('scoreboardModal');
       document.getElementById('cardInner').style.transform = 'rotateY(0deg)';
-      showToast('🔄 Spielstand von "' + modeLabel(gameMode) + '" zurückgesetzt.');
       updateUI();
       saveSession();
     }
@@ -1414,7 +1370,6 @@
       S.currentCard = null;
       S.isTuttoAchieved = false;
       if (gameMode === 'dice') resetDiceState();
-      showToast('🔄 Stapel neu gemischt.');
       updateUI();
       saveSession();
     }
@@ -1484,7 +1439,7 @@
     function applyConfig(path, value) {
       if (path === 'targetScore') {
         const n = parseInt(value, 10);
-        if (n > 0) { S.targetScore = n; showToast('🎯 Ziel: ' + n + ' Pkt'); }
+        if (n > 0) S.targetScore = n;
       } else if (path.indexOf('dice.') === 0) {
         const key = path.slice(5);
         if (key === 'onesFivesFree' || key === 'streetAutoTutto') {
@@ -1499,7 +1454,6 @@
             S.config.diceCount = n;
             if (S.dice.played.length > n || S.dice.currentRoll.length > n) {
               resetDiceState();
-              showToast('🎲 Laufender Würfelsatz durch neue Würfelanzahl zurückgesetzt.');
             }
           }
         } else {
@@ -1536,7 +1490,6 @@
       if (restored) {
         selectGameMode(gameMode);
         closeModal('modeSelectModal');
-        showToast('💾 Spielstand wiederhergestellt – Modus: ' + modeLabel(gameMode) + '!');
       } else {
         openModal('modeSelectModal');
         updateUI();
