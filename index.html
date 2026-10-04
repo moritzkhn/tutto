@@ -27,6 +27,35 @@
       color: #F8FAFC;
       overflow-x: hidden;
     }
+
+    /* --- VIEWPORT-FIX (mobiler Test) ---
+       1) Feste App-Höhe statt 100vh-Überlauf: dvh folgt der sichtbaren
+          Viewport-Höhe, wenn Safari seine Leisten ein-/ausblendet.
+       2) Safe-Area-Insets, damit Header/Footer nicht unter Statusleiste
+          bzw. Home-Indicator landen.
+       3) Footer bleibt immer am Viewport-Bottom, scrollt nur intern,
+          falls sein Inhalt zu hoch ist. */
+    html { height: 100%; }
+    body {
+      height: 100%;
+      overscroll-behavior: none;
+    }
+    .app-shell {
+      height: 100vh;
+      height: 100dvh;
+    }
+    .safe-top {
+      padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+    }
+    .safe-bottom {
+      padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    }
+    .footer-scroll {
+      max-height: 65vh;
+      max-height: 65dvh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
     
     .perspective-1000 { perspective: 1000px; }
     .transform-style-3d { transform-style: preserve-3d; }
@@ -56,10 +85,10 @@
     .die-btn.disabled .die-face .pip { background: #64748B; }
   </style>
 </head>
-<body class="flex flex-col h-screen max-w-md mx-auto justify-between bg-slate-900">
+<body class="app-shell flex flex-col max-w-md mx-auto justify-between bg-slate-900">
 
   <!-- TOP HEADER & PLAYER BAR -->
-  <header class="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between shadow-md">
+  <header class="safe-top shrink-0 bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between shadow-md">
     
     <!-- MODE / PLAYER PILL -->
     <button id="playerHeaderPill" onclick="openModal('scoreboardModal')" class="flex items-center bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-full border border-slate-600 transition">
@@ -102,10 +131,10 @@
   </header>
 
   <!-- MAIN CARD AREA -->
-  <main class="flex-1 flex flex-col items-center justify-center p-4 relative">
+  <main class="flex-1 min-h-0 overflow-hidden flex flex-col items-center justify-center p-4 relative">
     
     <!-- CARD CONTAINER (FLIP ANIMATION) -->
-    <div class="w-full max-w-xs h-[350px] perspective-1000">
+    <div class="w-full max-w-xs h-full max-h-[350px] perspective-1000">
       <div id="cardInner" class="w-full h-full relative transform-style-3d card-transition rounded-3xl shadow-2xl">
         
         <!-- CARD BACK (COVER) -->
@@ -153,7 +182,7 @@
   </main>
 
   <!-- SCORE ASSISTANT & CONTROLS (FULL GAME MODE ONLY) -->
-  <section id="fullGameSection" class="bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg">
+  <section id="fullGameSection" class="footer-scroll safe-bottom shrink-0 bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg">
     
     <!-- TURN SCORE DISPLAY -->
     <div class="bg-slate-900 rounded-2xl p-3 border border-slate-700 text-center mb-3 flex items-center justify-between px-4">
@@ -191,7 +220,7 @@
   </section>
 
   <!-- DICE SIMULATION SECTION (WÜRFEL-SIMULATION MODUS) -->
-  <section id="diceGameSection" class="hidden bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg">
+  <section id="diceGameSection" class="hidden footer-scroll safe-bottom shrink-0 bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg">
     <div class="bg-slate-900 rounded-2xl p-3 border border-slate-700 text-center mb-3 flex items-center justify-between px-4">
       <div class="text-left">
         <div class="text-[9px] text-slate-400 font-extrabold tracking-wider uppercase">Punkte dieser Runde</div>
@@ -218,7 +247,7 @@
   </section>
 
   <!-- PURE CARD DECK CONTROLS (STAPEL-NUR MODUS) -->
-  <section id="pureDeckSection" class="hidden bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg">
+  <section id="pureDeckSection" class="hidden bg-slate-800 border-t border-slate-700 p-4 rounded-t-3xl shadow-lg safe-bottom shrink-0">
     <button onclick="drawCard()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm py-4 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
       <i data-lucide="arrow-right-circle" class="w-5 h-5"></i>
       <span>NÄCHSTE KARTE ZIEHEN</span>
